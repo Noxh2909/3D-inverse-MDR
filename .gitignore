@@ -1,3 +1,17 @@
 /logs/
 /results/
 /videos/
+/text/
+/build/
+/assets/
+/dist/
+
+buildapp.sh
+app_icon_icns
+Interface.py
+training.py
+experiment2d.py
+analysis.py
+
+3D-iMDS.spec
+app_icon.icns

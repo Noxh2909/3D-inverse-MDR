@@ -17,7 +17,7 @@ from pyqtgraph.opengl import GLViewWidget, GLLinePlotItem, GLGridItem
 
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
-# Constants / Global configuration
+# Constant definitions
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
 
@@ -65,12 +65,12 @@ IMAGE_CONTAINER_WH = 130
 LABEL_SCREEN_MARGIN = 24
 VIS_DOT_THRESHOLD = 0.0
 
-ALIGN_OK_HTML = "<span style='color:#7CFC00'>aligned with {partner}</span>"
-ALIGN_BAD_HTML = "<span style='color:#ff6666'>not aligned with {partner}</span>"
+ALIGN_OK_HTML = "<span style='color:#7CFC00'>✅ {partner}</span>"
+ALIGN_BAD_HTML = "<span style='color:#ff6666'>❌ {partner}</span>"
 
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
-# Runtime state (globals)
+# Global state variables
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
 
@@ -80,6 +80,7 @@ point_labels: Dict[str, QLabel] = {}
 pair_lines: Dict[str, GLLinePlotItem] = {}
 points = []
 cube_items = []
+point_tokens = []
 lattice_items = []
 current_plane = 'xy'
 placement_phase = 1
@@ -93,7 +94,7 @@ HOVER_PREVIEW_LABEL: Optional[QLabel] = None
 
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
-# Debug / logging helpers
+# Logging helpers
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
 
@@ -102,7 +103,7 @@ def log_to_console(text):
     console_box.appendPlainText(text)
     
 def write_log_to_file(log_path: str, text: str):
-    try:
+    try:   
         with open(log_path, 'a', encoding='utf-8', newline='') as f:
             f.write(text + '\n')
     except Exception as e:
@@ -831,25 +832,6 @@ def _toggle_plane_grids_ui(checked: bool):
 def _debug_on() -> bool:
     return bool(btn_grid.isChecked())
 
-def show_pair_lines():
-    cats = set()
-    for pid in placed_points.keys():
-        if '.' in pid:
-            cats.add(pid.split('.')[0])
-    for cat in cats:
-        _update_pair_line(cat)
-
-def hide_pair_lines():
-    for cat, line in list(pair_lines.items()):
-        try:
-            view.removeItem(line)
-        except Exception:
-            pass
-        try:
-            line.setData(pos=np.empty((0, 3), dtype=float))
-        except Exception:
-            pass
-
 def _ensure_point_label(pid: str) -> QLabel:
     """Ensure a QLabel exists as overlay label for pid and return it."""
     if pid in point_labels:
@@ -942,6 +924,8 @@ def _ensure_hover_preview() -> QLabel:
         HOVER_PREVIEW_LABEL = lab
     return HOVER_PREVIEW_LABEL
 
+# This function previews the current category image near the mouse cursor in the 3D view.
+
 # def _show_hover_preview(cat: str, view_pos: QPoint):
 #     """Show small hover thumbnail near view_pos inside the scene."""
 #     pm = IMAGES_BY_CAT.get(cat)
@@ -985,8 +969,19 @@ def _hide_hover_preview():
             pass
 
 def _alignment_indicator_for(pid: str) -> str:
-    """Return token id only (no HTML indicator)."""
-    return pid
+    """Return HTML alignment indicator for a point and its partner."""
+    if pid not in placed_points or '.' not in pid:
+        return pid
+    partner = _partner_of(pid)
+    if not partner or partner not in placed_points:
+        return ALIGN_BAD_HTML.format(partner=partner or "?")
+    _, c_self = placed_points[pid]
+    _, c_part = placed_points[partner]
+    tol = _current_z_tol()
+    if abs(float(c_self[2]) - float(c_part[2])) <= tol:
+        return ALIGN_OK_HTML.format(partner=partner)
+    else:
+        return ALIGN_BAD_HTML.format(partner=partner)
 
 # Neue/angepasste Funktion: _update_point_color
 def _update_point_color(pid: str):
@@ -1029,7 +1024,7 @@ def _update_point_label(pid: str):
         lab.hide()
         return
     px, py = pr
-    lab.setText(pid)
+    lab.setText(_alignment_indicator_for(pid))
     lab.adjustSize()
     lab.move(int(px - lab.width() // 2), int(py - lab.height() - LABEL_OVER_POINT_MARGIN))
     if '.' not in pid:
@@ -1646,7 +1641,7 @@ def _current_z_tol():
 
 ztol_edit.returnPressed.connect(_update_all_point_labels)
 
-btn_grid = QPushButton("Enable Debug (^D)", view)
+btn_grid = QPushButton("Show Image (^D)", view)
 btn_grid.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
 btn_grid.setCheckable(True)
 btn_grid.show()
@@ -1677,21 +1672,19 @@ def _toggle_grid(checked: bool):
     if checked:
         show_cube()
         show_lattice(_current_step())
-        show_pair_lines()
         _show_axis_tick_labels(True)
         _update_all_point_labels()
-        btn_grid.setText("Disable Debug")
+        btn_grid.setText("Hide Image (^D)")
     else:
         hide_cube()
         hide_lattice()
-        hide_pair_lines()
         _show_axis_tick_labels(False)
         for pid, lab in list(image_labels.items()):
             try:
                 lab.hide()
             except Exception:
                 pass
-        btn_grid.setText("Enable Debug")
+        btn_grid.setText("Show Image (^D)")
 
 def _toggle_lock(checked: bool):
     globals()['LOCK_CAMERA'] = bool(checked)
@@ -1754,7 +1747,7 @@ panel.show()
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
 
-tokens_label = QLabel("Image Tokens:")
+tokens_label = QLabel("Images:")
 tokens_label.setStyleSheet("color: #fff; font-size: 14px; font-weight: 600; background: transparent;")
 tokens_label.adjustSize()
 tokens_label.show()
@@ -1895,7 +1888,7 @@ def _update_pair_line(cat: str):
                 pass
             del pair_lines[cat]
 
-for i in range(1, 11):
+for i in range(1, 17):
     t1 = DraggableToken(f"{i}.1", parent=point_dock)
     t2 = DraggableToken(f"{i}.2", parent=point_dock)
     for t in (t1, t2):
@@ -2136,7 +2129,7 @@ QPushButton:disabled {
 """)
 btn_reset.setStyleSheet(btn_combine.styleSheet())
 btn_submit.setStyleSheet(btn_combine.styleSheet())
-btn_start.setStyleSheet(btn_combine.styleSheet() + """QPushButton { background: #00cc66;}""")
+btn_start.setStyleSheet(btn_combine.styleSheet() + """QPushButton { background: #00cc66; border: solid lightgray;}""")
 
 try:
     sc_combine = QShortcut(QKeySequence("Meta+K"), win)

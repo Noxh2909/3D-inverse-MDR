@@ -94,6 +94,8 @@ image_labels: Dict[str, QLabel] = {}
 HOVER_PREVIEW_LABEL: Optional[QLabel] = None
 IS_DOCK_DRAG = False
 
+CURRENT_CONDITION = None  # "2d" oder "3d"
+
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
 # Logging helpers
@@ -266,7 +268,11 @@ class SceneView(GLViewWidget):
         hit = p0 + dir * t
         x, y, z = clamp_to_cube(float(hit.x()), float(hit.y()), float(hit.z()))
 
-        _set_point_position(point_id, (x, y, z))
+        if CURRENT_CONDITION == "2d":
+            # force 2D drop
+            _set_point_position(point_id, (x, y, AXIS_LEN * 0.5))
+        else:
+            _set_point_position(point_id, (x, y, z))
         _update_helper_lines(point_id)
         _mark_token_placed(point_id)
         ev.acceptProposedAction()
@@ -922,8 +928,72 @@ def _center_on_screen():
         except Exception:
             pass
 
+def _cube_center():
+    L = float(AXIS_LEN)
+    return QVector3D(L/2.0, L/2.0, L/2.0)
+
+def _fit_distance_for_extent(extent: float, margin: float = 2) -> float:
+    """Compute camera distance so a given extent is visible respecting FOV."""
+    w = max(1, view.width())
+    h = max(1, view.height())
+    vfov_deg = float(view.opts.get('fov', 60))
+    vfov = np.deg2rad(vfov_deg)
+    aspect = w / h
+    hfov = 2.0 * np.arctan(np.tan(vfov/2.0) * aspect)
+    half = extent / 2.0
+    d_v = half / np.tan(vfov/2.0)
+    d_h = half / np.tan(hfov/2.0)
+    return float(max(d_v, d_h) * margin)
+
+def _set_view_fitted(elevation=0, azimuth=0, zoom=1.0):
+    """Set camera to view cube center with optional elevation/azimuth and zoom multiplier."""
+    extent = float(AXIS_LEN)
+    dist = _fit_distance_for_extent(extent)
+    dist *= float(zoom)
+    view.opts['center'] = _cube_center()
+    view.setCameraPosition(distance=dist, elevation=elevation, azimuth=azimuth)
+
+def set_view_xy(offset_x=0, offset_y=0, offset_z=0):
+    """True top-down view onto XZ plane, with adjustable center offset."""
+    view.opts['ortho'] = True
+
+    cx = AXIS_LEN * 0.5 + offset_x
+    cy = AXIS_LEN * 0.5 + offset_y     
+    cz = AXIS_LEN * 0.5 + offset_z
+    view.opts['center'] = QVector3D(cx, cy, cz)
+
+    view.setCameraPosition(
+        distance=_fit_distance_for_extent(5),
+        elevation=90,   # top-down
+        azimuth=0       # XZ orientation
+    )
+
+# Camera helpers
+def set_view_default():
+    """Reset camera to the program's initial perspective view."""
+    try:
+        view.opts['ortho'] = False  # ensure perspective
+    except Exception:
+        pass
+    view.opts['center'] = _cube_center()
+    view.setCameraPosition(distance=_fit_distance_for_extent(13), elevation=35.3, azimuth=45)
+    try:
+        xyz_cb.setChecked(True)
+    except Exception:
+        pass
+
 win.show()
 _center_on_screen()
+CURRENT_CONDITION = random.choice(["2d", "3d"])
+
+if CURRENT_CONDITION == "2d":
+    set_view_xy()
+else:
+    set_view_default()
+
+condition_label.setText(f"{CURRENT_CONDITION.upper()} Condition")
+condition_label.adjustSize()
+condition_label.raise_()
 try:
     if win.windowHandle():
         win.windowHandle().screenChanged.connect(lambda *_: _center_on_screen())
@@ -1449,6 +1519,10 @@ def _set_point_position(pid: str, coords):
     """Set world position of a point sprite and update overlays/lines."""
     item = _ensure_point_item(pid)
     x, y, z = map(float, coords)
+    # --- SNAP LOGIC FOR 2D CONDITION ---
+    if CURRENT_CONDITION == "2d":
+        # lock Z always to mid plane (flat XY)
+        z = AXIS_LEN * 0.5
     pos = np.array([[x, y, z]], dtype=float)
     item.setData(pos=pos)
     placed_points[pid] = (item, [x, y, z])
@@ -1682,25 +1756,25 @@ def hide_lattice():
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
 
-def _cube_center():
-    L = float(AXIS_LEN)
-    return QVector3D(L/2.0, L/2.0, L/2.0)
+# def _cube_center():
+#     L = float(AXIS_LEN)
+#     return QVector3D(L/2.0, L/2.0, L/2.0)
 
-def _fit_distance_for_extent(extent: float, margin: float = 2) -> float:
-    """Compute camera distance so a given extent is visible respecting FOV."""
-    w = max(1, view.width())
-    h = max(1, view.height())
-    vfov_deg = float(view.opts.get('fov', 60))
-    vfov = np.deg2rad(vfov_deg)
-    aspect = w / h
-    hfov = 2.0 * np.arctan(np.tan(vfov/2.0) * aspect)
-    half = extent / 2.0
-    d_v = half / np.tan(vfov/2.0)
-    d_h = half / np.tan(hfov/2.0)
-    return float(max(d_v, d_h) * margin)
+# def _fit_distance_for_extent(extent: float, margin: float = 2) -> float:
+#     """Compute camera distance so a given extent is visible respecting FOV."""
+#     w = max(1, view.width())
+#     h = max(1, view.height())
+#     vfov_deg = float(view.opts.get('fov', 60))
+#     vfov = np.deg2rad(vfov_deg)
+#     aspect = w / h
+#     hfov = 2.0 * np.arctan(np.tan(vfov/2.0) * aspect)
+#     half = extent / 2.0
+#     d_v = half / np.tan(vfov/2.0)
+#     d_h = half / np.tan(hfov/2.0)
+#     return float(max(d_v, d_h) * margin)
 
-view.opts['center'] = _cube_center()
-view.setCameraPosition(distance=_fit_distance_for_extent(13), elevation=35.3, azimuth=45)
+# view.opts['center'] = _cube_center()
+# view.setCameraPosition(distance=_fit_distance_for_extent(13), elevation=35.3, azimuth=45)
 
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
@@ -1976,45 +2050,6 @@ panel_layout.addWidget(hint_row)
 
 hint_row.hide()
 
-def _set_view_fitted(elevation=0, azimuth=0, zoom=1.0):
-    """Set camera to view cube center with optional elevation/azimuth and zoom multiplier."""
-    extent = float(AXIS_LEN)
-    dist = _fit_distance_for_extent(extent)
-    dist *= float(zoom)
-    view.opts['center'] = _cube_center()
-    view.setCameraPosition(distance=dist, elevation=elevation, azimuth=azimuth)
-
-def set_view_xy():
-    """Switch to orthographic view focused on YZ plane (Z-Y)."""
-    global current_plane
-    current_plane = 'yz'
-    view.opts['ortho'] = True
-    log_session_event("Rotated View XY")
-    _set_view_fitted(elevation=0, azimuth=90, zoom=0.03)
-
-def set_view_yz():
-    """Switch to orthographic view focused on XZ plane (Z-X)."""
-    global current_plane
-    current_plane = 'xz'
-    view.opts['ortho'] = True
-    log_session_event("Rotated View XZ")
-    _set_view_fitted(elevation=0, azimuth=0, zoom=0.03)
-
-# Camera helpers
-def set_view_default():
-    """Reset camera to the program's initial perspective view."""
-    try:
-        view.opts['ortho'] = False  # ensure perspective
-    except Exception:
-        pass
-    # Match the startup camera center and angles
-    view.opts['center'] = _cube_center()
-    view.setCameraPosition(distance=_fit_distance_for_extent(13), elevation=35.3, azimuth=45)
-    try:
-        xyz_cb.setChecked(True)
-    except Exception:
-        pass
-
 # btn_xy.clicked.connect(set_view_xy)
 # btn_yz.clicked.connect(set_view_yz)
 
@@ -2266,6 +2301,23 @@ def _export_results():
         _position_header()
     except Exception:
         pass
+        # -------- SWITCH CONDITION AFTER SUBMIT --------
+    global CURRENT_CONDITION
+
+    # Toggle between 2d ↔ 3d
+    if CURRENT_CONDITION == "2d":
+        CURRENT_CONDITION = "3d"
+        set_view_default()
+    else:
+        CURRENT_CONDITION = "2d"
+        set_view_xy()
+
+    condition_label.setText(f"{CURRENT_CONDITION.upper()} Condition")
+    condition_label.adjustSize()
+    condition_label.raise_()
+
+    # Reset all placements for new condition
+    _reset_all_points()
 
 
 point_dock.adjustSize()

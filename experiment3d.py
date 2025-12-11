@@ -664,13 +664,18 @@ main_row.addWidget(view_wrap, 1, Qt.AlignmentFlag.AlignTop)
 #######################################################
 #######################################################
 
-
 # Add a top-left title label to the 3D view
 title_label = QLabel("Inverse MDS", parent=win)
 title_label.setStyleSheet("color: white; font-size: 26px; font-weight: 700; background: transparent;")
 title_label.adjustSize()
 title_label.move(20, 30)
 title_label.raise_()
+
+condition_label = QLabel("3D Condition", parent=view)
+condition_label.setStyleSheet("color: white; font-size: 16px; background: transparent; font-weight: bold;")
+condition_label.adjustSize()
+condition_label.move(10, 10)
+condition_label.raise_()
 
 line_top = QFrame(parent=win)
 line_top.setFrameShape(QFrame.Shape.HLine)
@@ -714,7 +719,7 @@ age_slider = QSlider(Qt.Orientation.Horizontal, parent=win)
 age_slider.setMinimum(18)
 age_slider.setMaximum(90)
 age_slider.setValue(24)
-age_slider.setFixedWidth(150)
+age_slider.setFixedWidth(160)
 age_slider.move(230, 115)
 age_slider.raise_()
 
@@ -724,80 +729,145 @@ age_value.adjustSize()
 age_value.move(270, 90)
 age_value.raise_()
 
+middle_line = QFrame(parent=win)
+middle_line.setFrameShape(QFrame.Shape.HLine)
+middle_line.setFrameShadow(QFrame.Shadow.Plain)
+middle_line.setStyleSheet("color: gray; background-color: transparent;")
+middle_line.setFixedWidth(370)
+middle_line.move(20, 150)
+
 #######################################################
 #######################################################
 #######################################################
 
+collapse_btn = QPushButton("▼", parent=win)
+collapse_btn.setFixedSize(20, 20)
+collapse_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+collapse_btn.setStyleSheet("""
+    QPushButton {
+        color: white;
+        background: transparent;
+        border: none;
+        font-size: 12px;
+        padding: 0px;
+    }
+    QPushButton:hover {
+        background: rgba(255,255,255,0.1);
+    }
+""")
+collapse_btn.move(105, 180)
+collapse_btn.raise_()
+
+is_collapsed = [False]  # Use list to allow modification in nested function
+
+def _toggle_checklist():
+    if is_collapsed[0]:
+        # Expand
+        collapse_btn.setText("▼")
+        status_label.show()
+        set_name_label.show()
+        name_cb.show()
+        check_hover_label.show()
+        check_hover_cb.show()
+        xyz_rotate_label.show()
+        xyz_cb.show()
+        stimuli_drag_label.show()
+        stimuli_cb.show()
+        start_label.show()
+        start_cb.show()
+        counter_label.show()
+        line_bottom.move(20, 350)
+        is_collapsed[0] = False
+    else:
+        # Collapse
+        collapse_btn.setText("▶")
+        status_label.show()
+        set_name_label.hide()
+        name_cb.hide()
+        check_hover_label.hide()
+        check_hover_cb.hide()
+        xyz_rotate_label.hide()
+        xyz_cb.hide()
+        stimuli_drag_label.hide()
+        stimuli_cb.hide()
+        start_label.hide()
+        start_cb.hide()
+        counter_label.hide()
+        line_bottom.move(20, 200)
+        is_collapsed[0] = True
+
+collapse_btn.clicked.connect(_toggle_checklist)
+
 status_label = QLabel("Checklist:", parent=win)
-status_label.setStyleSheet("color: white; font-size: 16px; background: transparent; font-weight: bold;")
+status_label.setStyleSheet("color: white; font-size: 16px; background: transparent; font-weight: bold; border: none;")
 status_label.adjustSize()
-status_label.move(20, 160)
+status_label.move(20, 180)
 status_label.raise_()
 
 set_name_label = QLabel("1. Set Name and Age:", parent=win)
 set_name_label.setStyleSheet("color: lightgray; font-size: 14px; background: transparent;")
 set_name_label.adjustSize()
-set_name_label.move(20, 190)
+set_name_label.move(20, 210)
 set_name_label.raise_()
 
 name_cb = QCheckBox("", parent=win)
 name_cb.setStyleSheet("color: lightgray; font-size: 14px; background: transparent;")
 name_cb.setEnabled(False)
-name_cb.move(340, 185)
+name_cb.move(340, 205)
 name_cb.raise_()
 
 check_hover_label = QLabel("2. Hover over Stimuli to preview images:", parent=win)
 check_hover_label.setStyleSheet("color: lightgray; font-size: 14px; background: transparent;")
 check_hover_label.adjustSize()
-check_hover_label.move(20, 220)
+check_hover_label.move(20, 240)
 check_hover_label.raise_()
 
 check_hover_cb = QCheckBox("", parent=win)
 check_hover_cb.setStyleSheet("color: lightgray; font-size: 14px; background: transparent;")
 check_hover_cb.setEnabled(False)
-check_hover_cb.move(340, 215)
+check_hover_cb.move(340, 235)
 check_hover_cb.raise_()
 
 xyz_rotate_label = QLabel("3. Rotate xyz axis or set default view (^D):", parent=win)
 xyz_rotate_label.setStyleSheet("color: lightgray; font-size: 14px; background: transparent;")
 xyz_rotate_label.adjustSize()
-xyz_rotate_label.move(20, 250)
+xyz_rotate_label.move(20, 270)
 xyz_rotate_label.raise_()
 
 xyz_cb = QCheckBox("", parent=win) 
 xyz_cb.setStyleSheet("color: lightgray; font-size: 14px; background: transparent;")
 xyz_cb.setEnabled(False)
-xyz_cb.move(340, 245)
+xyz_cb.move(340, 265)
 xyz_cb.raise_()
 
 stimuli_drag_label = QLabel("4. Drag stimuli into the 3D space and adjust:", parent=win)
 stimuli_drag_label.setStyleSheet("color: lightgray; font-size: 14px; background: transparent;")
 stimuli_drag_label.adjustSize()
-stimuli_drag_label.move(20, 280)
+stimuli_drag_label.move(20, 300)
 stimuli_drag_label.raise_()
 
 stimuli_cb = QCheckBox("", parent=win)  
 stimuli_cb.setStyleSheet("color: lightgray; font-size: 14px; background: transparent;")
 stimuli_cb.setEnabled(False)
-stimuli_cb.move(340, 275)
+stimuli_cb.move(340, 295)
 stimuli_cb.raise_()
 
 start_label = QLabel("5. Press \"Start\" to start the Experiment:", parent=win)
 start_label.setStyleSheet("color: lightgray; font-size: 14px; background: transparent;")
 start_label.adjustSize()
-start_label.move(20, 310)
+start_label.move(20, 330)
 start_label.raise_()
 
 start_cb = QCheckBox("", parent=win)
 start_cb.setStyleSheet("color: lightgray; font-size: 14px; background: transparent;")
 start_cb.setEnabled(False)
-start_cb.move(340, 305)
+start_cb.move(340, 325)
 start_cb.raise_()
 
 counter_label = QLabel("(0/5)", parent=win)
 counter_label.setStyleSheet("color: lightgray; font-size: 12px; background: transparent;")
 counter_label.adjustSize()
-counter_label.move(365, 312)
+counter_label.move(365, 332)
 counter_label.raise_()
 
 line_bottom = QFrame(parent=win)
@@ -805,14 +875,13 @@ line_bottom.setFrameShape(QFrame.Shape.HLine)
 line_bottom.setFrameShadow(QFrame.Shadow.Plain)
 line_bottom.setStyleSheet("color: gray; background-color: transparent;")
 line_bottom.setFixedWidth(370)
-line_bottom.move(20, 330)
+line_bottom.move(20, 350)
 
 # Update displayed age dynamically
 age_slider.valueChanged.connect(lambda v: age_value.setText(str(v)))
 name_input.textChanged.connect(lambda: (
     name_cb.setChecked(name_input.text().strip() != ""),
 ))
-
 
 #######################################################
 #######################################################
@@ -869,16 +938,18 @@ except Exception:
 
 def _start_experiment():
     global start_time
+    
     start_time = datetime.now()
     btn_start.setEnabled(False)
     start_cb.setChecked(True)
-    _update_progress_counter()
     cb_lock.setChecked(True)
     name_input.setDisabled(True)
     age_slider.setDisabled(True)
+
+    bool(_toggle_checklist() == 0)
     set_view_default()
+    _update_progress_counter()
     log_session_event("Experiment started...")
-    # _position_header()
 
 def project_point(p):
     """Project a world 3D point to 2D view pixel coordinates (x, y)."""

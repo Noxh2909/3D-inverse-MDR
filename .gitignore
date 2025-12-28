@@ -13,4 +13,5 @@ training.py
 experiment3d.py
 
 3D-iMDS.spec
+3D inverse MDS.spec
 app_icon.icns

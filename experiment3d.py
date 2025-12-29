@@ -47,6 +47,7 @@ GAP_H = 12
 PREVIEW_TOP_OFFSET = 22
 ACTIONS_TOP_OFFSET = -16
 SCENE_TOP_OFFSET = 22
+SCENE_BOTTOM_OFFSET = 22
 SCENE_FIXED_HEIGHT = 910
 HOVER_PREVIEW_MARGIN = 30
 BL_MARGIN_X, BL_MARGIN_Y = 10, 10
@@ -655,6 +656,12 @@ class DraggableToken(QLabel):
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
 
+QApplication.setHighDpiScaleFactorRoundingPolicy(
+    Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+)
+QApplication.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
+QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
+
 app = QApplication(sys.argv)
 try:
     app.setFont(QFont("SF Pro Text", 12))
@@ -715,8 +722,6 @@ preview_label.setStyleSheet("color: #fff; font-size: 14px; font-weight: 600; bac
 preview_label.adjustSize()
 preview_label.show()
 
-main_row.addWidget(left_col, 0)
-
 view = SceneView()
 view.setBackgroundColor('k')
 view.setCameraPosition(distance=8)
@@ -724,11 +729,20 @@ view.setCameraParams(fov=60)
 
 view_wrap = QWidget()
 vw_lay = QVBoxLayout(view_wrap)
-vw_lay.setContentsMargins(0, SCENE_TOP_OFFSET, 10, 0)
+vw_lay.setContentsMargins(0,20,20,20)
 vw_lay.setSpacing(0)
 vw_lay.addWidget(view)
-view_wrap.setFixedHeight(SCENE_FIXED_HEIGHT)
-main_row.addWidget(view_wrap, 1, Qt.AlignmentFlag.AlignTop)
+
+view_wrap.setSizePolicy(
+    QSizePolicy.Policy.Expanding,
+    QSizePolicy.Policy.Expanding
+)
+view.setSizePolicy(
+    QSizePolicy.Policy.Expanding,
+    QSizePolicy.Policy.Expanding
+)
+main_row.addWidget(left_col, 0)
+main_row.addWidget(view_wrap, 1)
 
 #######################################################
 #######################################################
@@ -1099,16 +1113,25 @@ def set_view_default():
     except Exception:
         pass
     view.opts['center'] = _cube_center()
-    view.setCameraPosition(distance=_fit_distance_for_extent(13), elevation=35.3, azimuth=45)
+    view.setCameraPosition(distance=_fit_distance_for_extent(14), elevation=35.3, azimuth=45)
 
 win.show()
-win.showFullScreen()
+# win.showFullScreen()
 # _center_on_screen()
 # try:
 #     if win.windowHandle():
 #         win.windowHandle().screenChanged.connect(lambda *_: _center_on_screen())
 # except Exception:
 #     pass
+
+def _show_fullscreen_on_current_screen():
+    screen = app.screenAt(QCursor.pos()) or app.primaryScreen()
+    if win.windowHandle():
+        win.windowHandle().setScreen(screen)
+    win.setGeometry(screen.geometry())
+    win.showFullScreen()
+
+_show_fullscreen_on_current_screen()
 
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
@@ -2115,15 +2138,6 @@ cb_lock.setChecked(True)
 cb_lock.show()
 cb_lock.raise_()
 
-# Elegante direkte Lambda-Lösung:
-orig_resize = view.resizeEvent
-view.resizeEvent = lambda ev: (
-    orig_resize(ev),
-    cb_lock.move(view.width() - cb_lock.width() - 20,
-                 view.height() - cb_lock.height() - 20),
-    cb_lock.raise_()
-)
-
 def _toggle_lock(checked: bool):
     globals()['LOCK_CAMERA'] = bool(checked)
 
@@ -2136,13 +2150,50 @@ cb_stimuli.setChecked(True)
 cb_stimuli.show()
 cb_stimuli.raise_()
 
-orig_resize2 = view.resizeEvent
-view.resizeEvent = lambda ev: (
-    orig_resize2(ev),
-    cb_stimuli.move(20,
-                 view.height() - cb_stimuli.height() - 20),
-    cb_stimuli.raise_()
-)
+# orig_resize = view.resizeEvent
+# view.resizeEvent = lambda ev: (
+#     orig_resize(ev),
+#     cb_lock.move(view.width() - cb_lock.width() - 20,
+#                  view.height() - cb_lock.height() - 20),
+#     cb_lock.raise_()
+# )
+
+# orig_resize2 = view.resizeEvent
+# view.resizeEvent = lambda ev: (
+#     orig_resize2(ev),
+#     cb_stimuli.move(20,
+#                  view.height() - cb_stimuli.height() - 20),
+#     cb_stimuli.raise_()
+# )
+
+class _ViewResizeFilter(QObject):
+    def eventFilter(self, obj, ev):
+        if ev.type() == ev.Type.Resize:
+            w = obj.width()
+            h = obj.height()
+
+            # Lock View checkbox (unten rechts)
+            try:
+                cb_lock.move(
+                    w - cb_lock.width() - 20,
+                    h - cb_lock.height() - 20
+                )
+                cb_lock.raise_()
+            except Exception:
+                pass
+
+            # Show Stimuli checkbox (unten links)
+            try:
+                cb_stimuli.move(
+                    20,
+                    h - cb_stimuli.height() - 20
+                )
+                cb_stimuli.raise_()
+            except Exception:
+                pass
+        return False
+    
+view.installEventFilter(_ViewResizeFilter(view))
 
 def _toggle_grid(checked: bool):
     if checked:

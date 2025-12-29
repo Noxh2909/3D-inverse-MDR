@@ -659,8 +659,6 @@ class DraggableToken(QLabel):
 QApplication.setHighDpiScaleFactorRoundingPolicy(
     Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
 )
-QApplication.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
-QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
 
 app = QApplication(sys.argv)
 try:
@@ -692,8 +690,17 @@ left_col.setFrameShape(QFrame.Shape.StyledPanel)
 left_col.setStyleSheet("QFrame { border: 0px solid #666; border-radius: 8px; }")
 left_col.setMinimumWidth(LEFT_W)
 left_v = QVBoxLayout(left_col)
-left_v.setContentsMargins(10, 10, 10, 10)
-left_v.setSpacing(10)
+left_v.setContentsMargins(10, 10, 10, 20)
+left_v.setSpacing(12)
+left_v.addStretch(1)
+
+# --- Image Preview ---
+preview_container = QWidget()
+preview_layout = QVBoxLayout(preview_container)
+preview_layout.setContentsMargins(0, 0, 0, 0)
+preview_layout.setSpacing(6)
+
+left_v.addWidget(preview_container)
 
 actions_row = QWidget(left_col)
 actions_h = QHBoxLayout(actions_row)
@@ -705,6 +712,7 @@ actions_h.setContentsMargins(0, 0, 0, 0)
 actions_h.setSpacing(8)
 
 preview_box = QLabel()
+preview_layout.addWidget(preview_box)
 preview_box.setFixedSize(230, 210)
 preview_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
 preview_box.setStyleSheet("""
@@ -718,6 +726,7 @@ preview_box.setStyleSheet("""
 preview_box.setText("Image Preview")
 
 preview_label = QLabel("Preview:")
+preview_layout.addWidget(preview_label)
 preview_label.setStyleSheet("color: #fff; font-size: 14px; font-weight: 600; background: transparent;")
 preview_label.adjustSize()
 preview_label.show()
@@ -929,7 +938,8 @@ rotate_and_adjust_cb.setEnabled(False)
 rotate_and_adjust_cb.move(355, 265)
 rotate_and_adjust_cb.raise_()
 
-stimuli_drag_label = QLabel("4. Drag and Drop Stimuli into the 3D space:", parent=win)
+# stimuli_drag_label = QLabel()
+stimuli_drag_label = QLabel(parent=win)
 stimuli_drag_label.setStyleSheet("color: lightgray; font-size: 14px; background: transparent;")
 stimuli_drag_label.adjustSize()
 stimuli_drag_label.move(20, 300)
@@ -952,6 +962,38 @@ adjust_token_height_cb.setStyleSheet("color: lightgray; font-size: 14px; backgro
 adjust_token_height_cb.setEnabled(False)
 adjust_token_height_cb.move(355, 325)
 adjust_token_height_cb.raise_()
+
+start_label = QLabel("6. Press \"Start\" to start the Experiment:", parent=win)
+start_label.setStyleSheet("color: lightgray; font-size: 14px; background: transparent;")
+start_label.adjustSize()
+start_label.move(20, 360)
+start_label.raise_()
+
+start_cb = QCheckBox("", parent=win)
+start_cb.setStyleSheet("color: lightgray; font-size: 14px; background: transparent;")
+start_cb.setEnabled(False)
+start_cb.move(355, 355)
+start_cb.raise_()
+
+counter_label = QLabel("(0/5)", parent=win)
+counter_label.setStyleSheet("color: lightgray; font-size: 12px; background: transparent;")
+counter_label.adjustSize()
+counter_label.move(375, 331)
+counter_label.raise_()
+
+line_bottom = QFrame(parent=win)
+line_bottom.setFrameShape(QFrame.Shape.HLine)
+line_bottom.setFrameShadow(QFrame.Shadow.Plain)
+line_bottom.setStyleSheet("color: gray; background-color: transparent;")
+line_bottom.setFixedWidth(380)
+line_bottom.move(20, 385)
+
+# Update displayed age dynamically
+age_slider.valueChanged.connect(lambda v: age_value.setText(str(v)))
+def _on_name_changed():
+    _update_progress_counter()
+
+name_input.textChanged.connect(_on_name_changed)
 
 # Global flags to track completion of steps 5 and 6
 ROTATION_DONE = False
@@ -996,37 +1038,30 @@ def _scene_wheel_wrapper(ev):
 
 view.wheelEvent = _scene_wheel_wrapper
 
-start_label = QLabel("6. Press \"Start\" to start the Experiment:", parent=win)
-start_label.setStyleSheet("color: lightgray; font-size: 14px; background: transparent;")
-start_label.adjustSize()
-start_label.move(20, 360)
-start_label.raise_()
-
-start_cb = QCheckBox("", parent=win)
-start_cb.setStyleSheet("color: lightgray; font-size: 14px; background: transparent;")
-start_cb.setEnabled(False)
-start_cb.move(355, 355)
-start_cb.raise_()
-
-counter_label = QLabel("(0/6)", parent=win)
-counter_label.setStyleSheet("color: lightgray; font-size: 12px; background: transparent;")
-counter_label.adjustSize()
-counter_label.move(375, 362)
-counter_label.raise_()
-
-line_bottom = QFrame(parent=win)
-line_bottom.setFrameShape(QFrame.Shape.HLine)
-line_bottom.setFrameShadow(QFrame.Shadow.Plain)
-line_bottom.setStyleSheet("color: gray; background-color: transparent;")
-line_bottom.setFixedWidth(380)
-line_bottom.move(20, 385)
-
-# Update displayed age dynamically
-age_slider.valueChanged.connect(lambda v: age_value.setText(str(v)))
-def _on_name_changed():
-    _update_progress_counter()
-
-name_input.textChanged.connect(_on_name_changed)
+def _update_label():
+    if CURRENT_CONDITION == "2d":
+        rotate_and_adjust_label.setText(
+            '3. View Rotation in this instance is forbidden:'
+        )
+        stimuli_drag_label.setText(
+            '4. Drag Stimuli into 2D space, adjust position:'
+        )
+        adjust_token_height_label.setText(
+            '5. Hold and Drag Stimuli to alter point position:'
+        )
+    else:
+        rotate_and_adjust_label.setText(
+            '3. Hold and Drag \"left-click\" to rotate view:'
+        )
+        stimuli_drag_label.setText(
+            '4. Drag and Drop Stimuli into the 3D space:'
+        )
+        adjust_token_height_label.setText(
+            '5. Hold Point and use \"Wheel\" to adjust height:'
+        )
+    adjust_token_height_label.adjustSize()
+    rotate_and_adjust_label.adjustSize()
+    stimuli_drag_label.adjustSize()
 
 #######################################################
 #######################################################
@@ -1048,22 +1083,22 @@ def _set_preview_for_category(cat: Optional[str]):
                                Qt.TransformationMode.SmoothTransformation)
     preview_box.setPixmap(pm_scaled)
 
-def _center_on_screen():
-    """Center main window on primary available geometry (macOS-friendly)."""
-    try:
-        screen = win.screen() or app.primaryScreen()
-        geo = screen.availableGeometry()
-        x = geo.x() + (geo.width() - win.width()) // 2
-        y = geo.y() + (geo.height() - win.height()) // 2
-        win.move(x, y)
-    except Exception:
-        try:
-            fg = win.frameGeometry()
-            center = app.primaryScreen().availableGeometry().center()
-            fg.moveCenter(center)
-            win.move(fg.topLeft())
-        except Exception:
-            pass
+# def _center_on_screen():
+#     """Center main window on primary available geometry (macOS-friendly)."""
+#     try:
+#         screen = win.screen() or app.primaryScreen()
+#         geo = screen.availableGeometry()
+#         x = geo.x() + (geo.width() - win.width()) // 2
+#         y = geo.y() + (geo.height() - win.height()) // 2
+#         win.move(x, y)
+#     except Exception:
+#         try:
+#             fg = win.frameGeometry()
+#             center = app.primaryScreen().availableGeometry().center()
+#             fg.moveCenter(center)
+#             win.move(fg.topLeft())
+#         except Exception:
+#             pass
 
 def _cube_center():
     L = float(AXIS_LEN)
@@ -1100,7 +1135,7 @@ def set_view_xy(offset_x=0, offset_y=0, offset_z=0):
     view.opts['center'] = QVector3D(cx, cy, cz)
 
     view.setCameraPosition(
-        distance=_fit_distance_for_extent(5),
+        distance=_fit_distance_for_extent(6),
         elevation=0,   # top-down
         azimuth=90       # XZ orientation
     )
@@ -1145,6 +1180,9 @@ def _start_experiment():
     if EXPERIMENT_RUNNING:
         return
 
+    if not name_input.text().strip():
+        return
+
     EXPERIMENT_RUNNING = True
     start_time = datetime.now()
 
@@ -1158,15 +1196,14 @@ def _start_experiment():
     if not is_collapsed[0]:
         _toggle_checklist(None)
     collapse_btn.show()
-
-    # if CURRENT_CONDITION == "2d":
-    #     set_view_xy()
-    # else:
-    #     set_view_default()
-
     _reset_all_points()
-    set_view_default()
-    
+    _apply_condition_defaults()
+    _update_progress_counter()
+     
+    if CURRENT_CONDITION == "2d":
+        set_view_xy()
+    else: 
+        set_view_default()
     log_session_event("Experiment started")
 
 def project_point(p):
@@ -1321,56 +1358,56 @@ def _build_axis_solid(axis: str, L: float, color=(1,1,1,1), width=3):
     else:
         return [_axis_segment((0,0,0), (0,0,L), color=color, width=width)]
 
-def _build_axis_dashed(axis: str, L: float, color=(1,1,1,1), width=3,
-                       dash_len: float=DASH_LEN, gap_len: float=GAP_LEN):
-    items = []
-    s = 0.0
-    step = max(1e-6, float(dash_len + gap_len))
-    while s < L - 1e-9:
-        e = min(L, s + dash_len)
-        if axis == 'x':
-            items.append(_axis_segment((s,0,0), (e,0,0), color=color, width=width))
-        elif axis == 'y':
-            items.append(_axis_segment((0,s,0), (0,e,0), color=color, width=width))
-        else:
-            items.append(_axis_segment((0,0,s), (0,0,e), color=color, width=width))
-        s += step
-    return items
+# def _build_axis_dashed(axis: str, L: float, color=(1,1,1,1), width=3,
+#                        dash_len: float=DASH_LEN, gap_len: float=GAP_LEN):
+#     items = []
+#     s = 0.0
+#     step = max(1e-6, float(dash_len + gap_len))
+#     while s < L - 1e-9:
+#         e = min(L, s + dash_len)
+#         if axis == 'x':
+#             items.append(_axis_segment((s,0,0), (e,0,0), color=color, width=width))
+#         elif axis == 'y':
+#             items.append(_axis_segment((0,s,0), (0,e,0), color=color, width=width))
+#         else:
+#             items.append(_axis_segment((0,0,s), (0,0,e), color=color, width=width))
+#         s += step
+#     return items
 
-def _screen_perp_tick_on_z(z_val: float, screen_len_px: int = 12):
-    """
-    Compute two world points that correspond to a short screen-perpendicular tick centered
-    on the projected Z-axis location at z_val. Returns ((xL,yL,z),(xR,yR,z)) or None.
-    """
-    Img = (0.0, 0.0, float(z_val))
-    pr = project_point(Img)
-    if pr is None:
-        return None
-    px, py = pr
-    dz = 0.01
-    pr2 = project_point((0.0, 0.0, float(z_val) + dz))
-    if pr2 is None:
-        return None
-    vx = float(pr2[0] - px)
-    vy = float(pr2[1] - py)
-    nx, ny = -vy, vx
-    nlen = (nx*nx + ny*ny) ** 0.5 or 1.0
-    nx /= nlen
-    ny /= nlen
-    half = screen_len_px * 0.5
-    pL = (int(px - nx * half), int(py - ny * half))
-    pR = (int(px + nx * half), int(py + ny * half))
-    p0L, p1L = screen_to_world_ray(pL[0], pL[1])
-    p0R, p1R = screen_to_world_ray(pR[0], pR[1])
-    if p0L is None or p1L is None or p0R is None or p1R is None:
-        return None
-    hitL = intersect_with_plane(p0L, p1L, 'xy')
-    hitR = intersect_with_plane(p0R, p1R, 'xy')
-    if hitL is None or hitR is None:
-        return None
-    xL, yL, _ = hitL
-    xR, yR, _ = hitR
-    return (xL, yL, float(z_val)), (xR, yR, float(z_val))
+# def _screen_perp_tick_on_z(z_val: float, screen_len_px: int = 12):
+#     """
+#     Compute two world points that correspond to a short screen-perpendicular tick centered
+#     on the projected Z-axis location at z_val. Returns ((xL,yL,z),(xR,yR,z)) or None.
+#     """
+#     Img = (0.0, 0.0, float(z_val))
+#     pr = project_point(Img)
+#     if pr is None:
+#         return None
+#     px, py = pr
+#     dz = 0.01
+#     pr2 = project_point((0.0, 0.0, float(z_val) + dz))
+#     if pr2 is None:
+#         return None
+#     vx = float(pr2[0] - px)
+#     vy = float(pr2[1] - py)
+#     nx, ny = -vy, vx
+#     nlen = (nx*nx + ny*ny) ** 0.5 or 1.0
+#     nx /= nlen
+#     ny /= nlen
+#     half = screen_len_px * 0.5
+#     pL = (int(px - nx * half), int(py - ny * half))
+#     pR = (int(px + nx * half), int(py + ny * half))
+#     p0L, p1L = screen_to_world_ray(pL[0], pL[1])
+#     p0R, p1R = screen_to_world_ray(pR[0], pR[1])
+#     if p0L is None or p1L is None or p0R is None or p1R is None:
+#         return None
+#     hitL = intersect_with_plane(p0L, p1L, 'xy')
+#     hitR = intersect_with_plane(p0R, p1R, 'xy')
+#     if hitL is None or hitR is None:
+#         return None
+#     xL, yL, _ = hitL
+#     xR, yR, _ = hitR
+#     return (xL, yL, float(z_val)), (xR, yR, float(z_val))
 
 def _build_axis_ticks(axis: str, L: float, tick_step: float=0,
                       tick_size: float=TICK_SIZE, color=(1,1,1,0.9), width=2):
@@ -1405,9 +1442,49 @@ def _build_axes_with_ticks(L: float):
     items += _build_axis_ticks('z', L, tick_step=step, color=(0,0,1,0.9), width=2)
     return items
 
-axis_items = _build_axes_with_ticks(AXIS_LEN)
-for it in axis_items:
-    view.addItem(it)
+AXIS_ITEMS = {
+    "x": [],
+    "y": [],
+    "z": [],
+}
+
+def _build_axes():
+    step = _auto_tick_step(AXIS_LEN)
+
+    AXIS_ITEMS["x"] = (
+        _build_axis_solid('x', AXIS_LEN, color=(1,0,0,1), width=3) +
+        _build_axis_ticks('x', AXIS_LEN, tick_step=step, color=(1,0,0,0.9), width=2)
+    )
+
+    AXIS_ITEMS["y"] = (
+        _build_axis_solid('y', AXIS_LEN, color=(0,1,0,1), width=3) +
+        _build_axis_ticks('y', AXIS_LEN, tick_step=step, color=(0,1,0,0.9), width=2)
+    )
+
+    AXIS_ITEMS["z"] = (
+        _build_axis_solid('z', AXIS_LEN, color=(0,0,1,1), width=3) +
+        _build_axis_ticks('z', AXIS_LEN, tick_step=step, color=(0,0,1,0.9), width=2)
+    )
+    
+_build_axes()
+
+for items in AXIS_ITEMS.values():
+    for it in items:
+        view.addItem(it)
+        
+def _show_z_axis():
+    for it in AXIS_ITEMS["y"]:
+        try:
+            view.addItem(it)
+        except Exception:
+            pass
+
+def _hide_z_axis():
+    for it in AXIS_ITEMS["y"]:
+        try:
+            view.removeItem(it)
+        except Exception:
+            pass
 
 yz_grid = GLGridItem()
 yz_grid.setSize(x=AXIS_LEN, y=AXIS_LEN)
@@ -2068,6 +2145,7 @@ def position_axis_labels():
 # ---------------------------------------------------------------------
 
 panel = QFrame(parent=left_col)
+left_v.addWidget(panel)
 panel.setFrameShape(QFrame.Shape.StyledPanel)
 panel.setStyleSheet(
     """
@@ -2234,25 +2312,24 @@ panel.adjustSize()
 panel.setMinimumSize(150, 250)
 panel.show()
 
-# Add panel to left layout if not already present
-left_v.addWidget(panel)
-
 # ---------------------------------------------------------------------
 # Tokens / token dock
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
 
 tokens_label = QLabel("Stimuli:")
+left_v.addWidget(tokens_label)
 tokens_label.setStyleSheet("color: #fff; font-size: 14px; font-weight: 600; background: transparent;")
 tokens_label.adjustSize()
 tokens_label.show()
 
 point_dock = QFrame()
+left_v.addWidget(point_dock)
 point_dock.setFrameShape(QFrame.Shape.StyledPanel)
 point_dock.setStyleSheet("QFrame { background: rgba(0,0,0,120); border: 1px solid #777; border-radius: 6px; }")
 
 point_dock_layout = QGridLayout(point_dock)
-point_dock_layout.setContentsMargins(8, 8, 8, 8)
+point_dock_layout.setContentsMargins(10, 8, 8, 8)
 point_dock_layout.setHorizontalSpacing(6)
 point_dock_layout.setVerticalSpacing(8)
 
@@ -2431,53 +2508,69 @@ def _axis_display_name(edit_widget: QLineEdit, combo_widget, fallback: str) -> s
         return f"{label}"
     except Exception:
         return f"{fallback}"
-
+    
 def _export_results():
-    """Export combined points to CSV if all pairs are combined."""
-    btn_start.setEnabled(True)
+    """Export combined points to CSV (condition-specific folder)."""
+
     base = os.path.dirname(os.path.abspath(__file__))
-    out_dir = os.path.join(base, "results")
+    results_root = os.path.join(base, "results")
+
+    # --- determine condition folder ---
+    condition = CURRENT_CONDITION or "unknown"
+    condition_dir = os.path.join(results_root, condition.lower())
+
     try:
-        os.makedirs(out_dir, exist_ok=True)
-    except Exception:
-        pass
+        os.makedirs(condition_dir, exist_ok=True)
+    except Exception as e:
+        log_to_console(f"Failed to create results directory: {e}")
+        return
+
+    # --- build filename: name_date_time.csv ---
+    participant_name = name_input.text().strip().replace(" ", "_")
+    if not participant_name:
+        participant_name = "anonymous"
+
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    csv_path = os.path.join(out_dir, f"embedding_{ts}.csv")
-    # --- Write CSV in requested format ---
+    filename = f"{participant_name}_{ts}.csv"
+    csv_path = os.path.join(condition_dir, filename)
+
+    # --- write CSV ---
     try:
         with open(csv_path, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
 
-            # --- header metadata ---
-            participant_name = name_input.text().strip()
-            w.writerow([f"Participant: {participant_name}"])
+            # --- metadata ---
+            w.writerow([f"Participant: {participant_name.replace('_', ' ')}"])
 
-            elapsed_seconds = None
             global start_time
             if start_time is not None:
-                elapsed_seconds = (datetime.now() - start_time).total_seconds()
-                w.writerow([f"Time: {elapsed_seconds:.2f}"])
+                elapsed = (datetime.now() - start_time).total_seconds()
+                w.writerow([f"Time: {elapsed:.2f}"])
             else:
                 w.writerow(["Time:"])
 
-            w.writerow([f"Condition: {CURRENT_CONDITION}"])
+            w.writerow([f"Condition: {condition}"])
             w.writerow([])
 
-            # --- data header ---
+            # --- header ---
             w.writerow(["mask_png", "x", "y", "z"])
 
-            # --- data rows ---
+            # --- data ---
             rows = _collect_combined_points_norm()
             for name, xn, yn, zn in rows:
-                w.writerow([name, f"{xn:.6f}", f"{yn:.6f}", f"{zn:.6f}"])
-    except Exception:
-        pass
+                w.writerow([name, f"{xn:.6f}", f"{yn:.6f}", f"{yn:.6f}"])
+
+    except Exception as e:
+        log_to_console(f"Failed to write CSV: {e}")
+        return
+
+    # --- UI feedback ---
     try:
-        header_label.setText(f"Saved CSV: {os.path.basename(csv_path)}")
+        header_label.setText(f"Saved CSV: {condition}/{filename}")
         _position_header()
     except Exception:
         pass
-    # # -------- SWITCH CONDITION AFTER SUBMIT --------
+    # -------- SWITCH CONDITION AFTER SUBMIT --------
     # global CURRENT_CONDITION
     
     # # Toggle between 2d ↔ 3d
@@ -2492,7 +2585,7 @@ def _export_results():
     # condition_label.adjustSize()
     # condition_label.raise_()
 
-    # # Reset all placements for new condition
+    # --- reset & log ---
     _reset_all_points()
     log_session_event("submitted, finished experiment")
 
@@ -2506,51 +2599,41 @@ btn_start = QPushButton("Start", left_col)
 btn_start.setDisabled(True)
 
 def _update_start_button_state():
-    """Enable Start button only if all tutorial conditions are met AND experiment not started."""
-    if EXPERIMENT_RUNNING:
-        return
-
     btn_start.setEnabled(
+        not EXPERIMENT_RUNNING and
         bool(name_input.text().strip()) and
         check_hover_cb.isChecked() and
+        rotate_and_adjust_cb.isChecked() and
         stimuli_cb.isChecked() and
-        adjust_token_height_cb.isChecked() and
-        rotate_and_adjust_cb.isChecked()
+        adjust_token_height_cb.isChecked()
     )
 
 def _update_progress_counter():
     completed = 0
 
-    # 1) Name
     name_ok = bool(name_input.text().strip())
     name_cb.setChecked(name_ok)
-    if name_ok:
+    if name_cb.isChecked():
         completed += 1
-
-    # 2) Hover
     if check_hover_cb.isChecked():
         completed += 1
-
-    # 3) Stimuli drag
+    if rotate_and_adjust_cb.isChecked():
+        completed += 1
     if stimuli_cb.isChecked():
         completed += 1
-
-    # 4) Rotation
-    if ROTATION_DONE:
-        rotate_and_adjust_cb.setChecked(True)
-        completed += 1
-
-    # 5) Height adjust
-    if HEIGHT_ADJUST_DONE:
-        adjust_token_height_cb.setChecked(True)
+    if adjust_token_height_cb.isChecked():
         completed += 1
 
     counter_label.setText(f"({completed}/5)")
     counter_label.adjustSize()
 
-    # Start-Freigabe NUR vor Experiment
-    if not EXPERIMENT_RUNNING:
-        _update_start_button_state()
+    _update_start_button_state()
+    
+name_input.textChanged.connect(_update_progress_counter)
+check_hover_cb.toggled.connect(_update_progress_counter)
+rotate_and_adjust_cb.toggled.connect(_update_progress_counter)
+stimuli_cb.toggled.connect(_update_progress_counter)
+adjust_token_height_cb.toggled.connect(_update_progress_counter)
     
 btn_grid = QPushButton("Set View (^D)", left_col)
 btn_reset.setFixedSize(110, 25)
@@ -2776,17 +2859,40 @@ _timer.timeout.connect(_update_all_point_labels)
 _timer.timeout.connect(_update_axis_tick_labels)
 _timer.start()
 
+def _apply_condition_defaults():
+    global ROTATION_DONE, HEIGHT_ADJUST_DONE
+
+    if CURRENT_CONDITION == "2d":
+        ROTATION_DONE = True
+        HEIGHT_ADJUST_DONE = True
+
+        rotate_and_adjust_cb.setChecked(True)
+        adjust_token_height_cb.setChecked(True)
+    else:
+        ROTATION_DONE = False
+        HEIGHT_ADJUST_DONE = False
+
+        rotate_and_adjust_cb.setChecked(False)
+        adjust_token_height_cb.setChecked(False)
+
 # CURRENT_CONDITION = random.choice(["2d", "3d"])
 CURRENT_CONDITION = "3d"
+_update_label()
+_apply_condition_defaults()
 
 if CURRENT_CONDITION == "2d":
-    cb_lock.setChecked(True)       
-    btn_grid.hide()
-    btn_grid.setChecked(True)
+    rotate_and_adjust_cb.setChecked
+    adjust_token_height_cb.setChecked
+    cb_lock.setChecked(True)  
+    btn_grid.setDisabled(True)
+    cb_lock.hide()
     set_view_xy()
+    _hide_z_axis()
 else:
     cb_lock.setChecked(False)
+    cb_lock.show()
     set_view_default()
+    _show_z_axis()
 
 condition_label.setText(f"{CURRENT_CONDITION.upper()} Condition")
 condition_label.adjustSize()

@@ -11,6 +11,7 @@ app_icon_icns
 Interface.py
 training.py
 experiment3d.py
+experiment2d.py
 
 3D-iMDS.spec
 3D inverse MDS.spec

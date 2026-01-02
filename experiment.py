@@ -88,7 +88,6 @@ point_tokens = []
 lattice_items = []
 current_plane = 'xy'
 placement_phase = 1
-start_time = None
 LOCK_CAMERA = False
 
 IMAGES_BY_CAT: Dict[str, QPixmap] = {}
@@ -106,28 +105,66 @@ EXPERIMENT_RUNNING = False
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
 
-def log_to_console(text):
-    text = f"[{datetime.now().strftime('%H:%M:%S')}] {text}"
-    console_box.appendPlainText(text)
-    
-def write_log_to_file(log_path: str, text: str):
-    try:   
-        with open(log_path, 'a', encoding='utf-8', newline='') as f:
-            f.write(text + '\n')
-    except Exception as e:
-        log_to_console(f"Failed to write log: {e}")
-    
-def log_session_event(event: str):
-    if not start_time:
-        return
-    elapsed = (datetime.now() - start_time).total_seconds()
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    base = os.path.dirname(os.path.abspath(__file__))
-    log_dir = os.path.join(base, "logs")
-    os.makedirs(log_dir, exist_ok=True)
-    log_path = os.path.join(log_dir, f"session_log_{start_time.strftime('%Y%m%d_%H%M%S')}.csv")
-    write_log_to_file(log_path, f"{timestamp},{elapsed:.2f},{event}")
-    log_to_console(event)
+class Logger:
+    def __init__(self, console_box):
+        self.console_box = console_box
+        self.start_time: Optional[datetime] = None
+        
+    def log_to_console(self, text: str):
+        """
+        Docstring für log_to_console
+        
+        :param self: self
+        :param text: arg
+        :type text: str
+        """
+        text = f"[{datetime.now().strftime('%H:%M:%S')}] {text}"
+        self.console_box.appendPlainText(text)
+
+    def write_log_to_file(self, log_path: str, text: str):
+        """
+        Docstring für write_log_to_file
+        
+        :param self: self
+        :param log_path: path
+        :type log_path: str
+        :param text: arg
+        :type text: str
+        """
+        try:
+            with open(log_path, 'a', encoding='utf-8', newline='') as f:
+                f.write(text + '\n')
+        except Exception as e:
+            self.log_to_console(f"Failed to write log: {e}")
+
+    def log_session_event(self, event: str):
+        """
+        Docstring für log_session_event
+        
+        :param self: self
+        :param event: Logging Output to Event Terminal
+        :type event: str
+        """
+        if not self.start_time:
+            return
+
+        elapsed = (datetime.now() - self.start_time).total_seconds()
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        base = os.path.dirname(os.path.abspath(__file__))
+        log_dir = os.path.join(base, "logs")
+        os.makedirs(log_dir, exist_ok=True)
+
+        log_path = os.path.join(
+            log_dir,
+            f"session_log_{self.start_time.strftime('%Y%m%d_%H%M%S')}.csv"
+        )
+
+        self.write_log_to_file(
+            log_path,
+            f"{timestamp},{elapsed:.2f},{event}"
+        )
+        self.log_to_console(event)
 
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
@@ -670,6 +707,7 @@ except Exception:
         pass
 
 win = QMainWindow()
+win.setUpdatesEnabled(False)
 # win.setFixedSize(1400, 800)
 # win.setWindowTitle("3D inverse-MDS for embedding data")
 
@@ -1013,7 +1051,9 @@ def _scene_mouse_move_wrapper(ev):
                 ROTATION_DONE = True
                 rotate_and_adjust_cb.setChecked(True)
                 _update_progress_counter()
-                log_session_event("View rotation detected (Step 5)")
+                # log_session_event("View rotation detected (Step 5)")
+    position_axis_labels()
+    _update_all_point_labels()
     
     _original_scene_mouse_move(ev)
 
@@ -1032,7 +1072,7 @@ def _scene_wheel_wrapper(ev):
             HEIGHT_ADJUST_DONE = True
             adjust_token_height_cb.setChecked(True)
             _update_progress_counter()
-            log_session_event("Height adjustment detected (Step 6)")
+            # log_session_event("Height adjustment detected (Step 6)")
     
     _original_scene_wheel(ev)
 
@@ -1150,7 +1190,11 @@ def set_view_default():
     view.opts['center'] = _cube_center()
     view.setCameraPosition(distance=_fit_distance_for_extent(14), elevation=35.3, azimuth=45)
 
-win.show()
+    position_axis_labels()
+    logger.log_session_event("Set Default View")
+    _update_all_point_labels()
+
+# win.show()
 # win.showFullScreen()
 # _center_on_screen()
 # try:
@@ -1166,7 +1210,7 @@ def _show_fullscreen_on_current_screen():
     win.setGeometry(screen.geometry())
     win.showFullScreen()
 
-_show_fullscreen_on_current_screen()
+# _show_fullscreen_on_current_screen()
 
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
@@ -1185,6 +1229,7 @@ def _start_experiment():
 
     EXPERIMENT_RUNNING = True
     start_time = datetime.now()
+    logger.start_time = start_time
 
     start_cb.setChecked(True)
     cb_lock.setChecked(True)
@@ -1204,7 +1249,7 @@ def _start_experiment():
         set_view_xy()
     else: 
         set_view_default()
-    log_session_event("Experiment started")
+    logger.log_session_event("Experiment started")
 
 def project_point(p):
     """Project a world 3D point to 2D view pixel coordinates (x, y)."""
@@ -1628,7 +1673,7 @@ def _ensure_hover_preview() -> QLabel:
 #     lab.show()
 #     lab.lower()
 
-def _show_hover_preview_over_dock(cat: str):
+def _show_hover_preview_over_dock_impl(cat: str):
     """Show larger preview above the token dock for a category."""
     pm_orig = IMAGES_ORIG.get(cat) or IMAGES_BY_CAT.get(cat)
     if pm_orig is None or pm_orig.isNull():
@@ -1891,7 +1936,7 @@ def _reset_all_points():
     globals()['placement_phase'] = 1
     _update_token_states()
     _update_submit_state()
-    log_session_event("Reset all placed points")
+    logger.log_session_event("Reset all placed points")
 
 
 def _add_or_update_point(coords):
@@ -2218,7 +2263,11 @@ cb_lock.raise_()
 
 def _toggle_lock(checked: bool):
     globals()['LOCK_CAMERA'] = bool(checked)
-
+    if checked:
+        logger.log_session_event("camera locked")
+    else:
+        logger.log_session_event("camera unlocked")
+        
 cb_lock.toggled.connect(_toggle_lock)
 
 cb_stimuli = QCheckBox("Show Stimuli (^B)", parent=view)
@@ -2474,7 +2523,9 @@ def _update_submit_state():
         placed = len(placed_points)
         started = bool(start_cb.isChecked())
         btn_submit.setEnabled(placed == total and started)
+        # btn_submit.setEnabled(started)
     except Exception:
+        logger.log_session_event("Error")
         pass
 
 def _collect_combined_points_norm():
@@ -2486,17 +2537,23 @@ def _collect_combined_points_norm():
     for pid, (_item, coords) in placed_points.items():
         x, y, z = map(float, coords)
 
-        xn = (x - half) / half
-        yn = (y - half) / half
-        zn = (z - half) / half
-
         cat = pid.split('.')[0]
-
         png_name = PNG_NAME_BY_CAT.get(cat, pid)
+
+        if CURRENT_CONDITION == "2d":
+            # 2D = XZ-Ebene, Y ist bedeutungslos
+            xn = (x - half) / half
+            yn = (z - half) / half   # zweite echte 2D-Dimension
+            zn = 0.0                 # explizit fix
+        else:
+            # echtes 3D
+            xn = (x - half) / half
+            yn = (y - half) / half
+            zn = (z - half) / half
 
         data.append((png_name, xn, yn, zn))
 
-    # Optional: stabil nach Dateiname sortieren
+    # stabil sortieren (für Matrix-Vergleiche essenziell)
     data.sort(key=lambda t: t[0])
 
     return data
@@ -2522,7 +2579,7 @@ def _export_results():
     try:
         os.makedirs(condition_dir, exist_ok=True)
     except Exception as e:
-        log_to_console(f"Failed to create results directory: {e}")
+        logger.log_session_event(f"Failed to create results directory: {e}")
         return
 
     # --- build filename: name_date_time.csv ---
@@ -2558,18 +2615,33 @@ def _export_results():
             # --- data ---
             rows = _collect_combined_points_norm()
             for name, xn, yn, zn in rows:
-                w.writerow([name, f"{xn:.6f}", f"{yn:.6f}", f"{yn:.6f}"])
+
+                if CURRENT_CONDITION == "2d":
+                    # visuell: X horizontal, Z vertikal
+                    x_csv = xn
+                    y_csv = yn   # ← DAS ist deine zweite Dimension
+                    z_csv = 0.0
+                else:
+                    # echtes 3D
+                    x_csv = xn 
+                    y_csv = zn #Height depth vertauschen
+                    z_csv = yn
+
+                w.writerow([
+                    name,
+                    f"{x_csv:.6f}",
+                    f"{y_csv:.6f}",
+                    f"{z_csv:.6f}"
+                ])
 
     except Exception as e:
-        log_to_console(f"Failed to write CSV: {e}")
+        logger.log_session_event(f"Failed to write CSV: {e}")
         return
-
-    # --- UI feedback ---
-    try:
-        header_label.setText(f"Saved CSV: {condition}/{filename}")
-        _position_header()
-    except Exception:
-        pass
+    # try:
+    #     header_label.setText("Experiment")
+    #     _position_header()
+    # except Exception:
+    #     pass
     # -------- SWITCH CONDITION AFTER SUBMIT --------
     # global CURRENT_CONDITION
     
@@ -2587,7 +2659,8 @@ def _export_results():
 
     # --- reset & log ---
     _reset_all_points()
-    log_session_event("submitted, finished experiment")
+    logger.log_session_event("submitted, finished experiment")
+    app.quit
 
 
 point_dock.adjustSize()
@@ -2761,6 +2834,7 @@ event_terminal_label.move(0, 320)
 
 console_box = QPlainTextEdit(preview_col)
 console_box.setReadOnly(True)
+logger = Logger(console_box)
 console_box.setStyleSheet("""
     QPlainTextEdit {
         background: rgba(255,255,255,0.1);
@@ -2828,7 +2902,7 @@ def apply_labels():
     for lab in (axis_label_x, axis_label_y, axis_label_z):
         lab.show()
         lab.raise_()
-    header_label.setText(f"X: {tx}    Y: {tz}    Z: {ty}")
+    # header_label.setText(f"X: {tx}    Y: {tz}    Z: {ty}")
     _position_header()
     position_axis_labels()
 
@@ -2852,12 +2926,11 @@ view.sigMouseMoved = getattr(view, 'sigMouseMoved', None)
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
 
-_timer = QTimer()
-_timer.setInterval(1000 // 60)
-_timer.timeout.connect(position_axis_labels)
-_timer.timeout.connect(_update_all_point_labels)
-_timer.timeout.connect(_update_axis_tick_labels)
-_timer.start()
+CURRENT_CONDITION = "2d"
+
+# ------------------------------------------------------------
+# Condition defaults (MUSS vor Counter kommen)
+# ------------------------------------------------------------
 
 def _apply_condition_defaults():
     global ROTATION_DONE, HEIGHT_ADJUST_DONE
@@ -2865,60 +2938,96 @@ def _apply_condition_defaults():
     if CURRENT_CONDITION == "2d":
         ROTATION_DONE = True
         HEIGHT_ADJUST_DONE = True
-
         rotate_and_adjust_cb.setChecked(True)
         adjust_token_height_cb.setChecked(True)
     else:
         ROTATION_DONE = False
         HEIGHT_ADJUST_DONE = False
-
         rotate_and_adjust_cb.setChecked(False)
         adjust_token_height_cb.setChecked(False)
 
-# CURRENT_CONDITION = random.choice(["2d", "3d"])
-CURRENT_CONDITION = "3d"
-_update_label()
-_apply_condition_defaults()
+# ------------------------------------------------------------
+# Startup finalization (EINMALIG)
+# ------------------------------------------------------------
 
-if CURRENT_CONDITION == "2d":
-    rotate_and_adjust_cb.setChecked
-    adjust_token_height_cb.setChecked
-    cb_lock.setChecked(True)  
-    btn_grid.setDisabled(True)
-    cb_lock.hide()
-    set_view_xy()
-    _hide_z_axis()
-else:
-    cb_lock.setChecked(False)
-    cb_lock.show()
-    set_view_default()
-    _show_z_axis()
+def _finalize_ui_startup():
+    # 1) Condition-spezifische Defaults setzen
+    _apply_condition_defaults()
+
+    # 2) Texte + Progress
+    _update_label()
+    _update_progress_counter()
+
+    # 3) Header & Axis-Labels
+    position_axis_labels()
+
+    # 4) Kamera & Achsen
+    if CURRENT_CONDITION == "2d":
+        rotate_and_adjust_cb.setChecked
+        adjust_token_height_cb.setChecked
+        cb_lock.setChecked(True)  
+        btn_grid.setDisabled(True)
+        cb_lock.hide()
+        set_view_xy()
+        _hide_z_axis()
+    else:
+        cb_lock.setChecked(False)
+        cb_lock.show()
+        set_view_default()
+        _show_z_axis()
+
+    # 5) Ein sauberer Layout-Pass
+    win.adjustSize()
+
+    # 6) Rendering aktivieren
+    win.setUpdatesEnabled(True)
+
+    # 7) JETZT anzeigen (kein Flackern)
+    _show_fullscreen_on_current_screen()
+
+# ------------------------------------------------------------
+# Condition Label
+# ------------------------------------------------------------
 
 condition_label.setText(f"{CURRENT_CONDITION.upper()} Condition")
 condition_label.adjustSize()
 condition_label.raise_()
 
+# ------------------------------------------------------------
+# Resize handling (statt Timer!)
+# ------------------------------------------------------------
+
 _old_win_resize = win.resizeEvent
+
 def _win_resize(ev):
     if _old_win_resize:
         _old_win_resize(ev)
+
     _position_header()
-    _update_token_states()
     position_axis_labels()
     _update_all_point_labels()
-    cb_lock.move(view.width() - cb_lock.width() - 20, view.height() - cb_lock.height() - 20)
+    _update_token_states()
+
+    # Lock-Checkbox unten rechts im View
+    cb_lock.move(
+        view.width() - cb_lock.width() - 20,
+        view.height() - cb_lock.height() - 20
+    )
+    cb_lock.raise_()
 
 win.resizeEvent = _win_resize
 
-try:
-    _old__show_hover_preview_over_dock = _show_hover_preview_over_dock
-    def _show_hover_preview_over_dock(cat: str):
-        _old__show_hover_preview_over_dock(cat)
-        try:
-            _set_preview_for_category(cat)
-        except Exception:
-            pass
-except Exception:
-    pass
+# ------------------------------------------------------------
+# Hover-Preview Wrapper (optional, aber korrekt)
+# ------------------------------------------------------------
 
+def _show_hover_preview_over_dock(cat: str):
+    _show_hover_preview_over_dock_impl(cat)
+    _set_preview_for_category(cat)
+
+# ------------------------------------------------------------
+# Startup trigger (EINMAL, verzögert)
+# ------------------------------------------------------------
+
+QTimer.singleShot(0, _finalize_ui_startup)
 sys.exit(app.exec())

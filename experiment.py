@@ -172,91 +172,115 @@ class Logger:
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
 
-def _pictures_dir() -> str:
-    """Return the 'pictures' subfolder path relative to this script."""
-    base = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base, "pictures")
+class FileHandler:
+    def __init__(
+        self,
+        point_tokens,
+        images_by_cat: dict,
+        images_orig: dict,
+        png_name_by_cat: dict,
+        image_max_wh: int,
+    ):
+        self.point_tokens = point_tokens
+        self.IMAGES_BY_CAT = images_by_cat
+        self.IMAGES_ORIG = images_orig
+        self.PNG_NAME_BY_CAT = png_name_by_cat
+        self.IMAGE_MAX_WH = image_max_wh
 
-def _token_categories() -> list[str]:
-    """Return category names derived from point token ids or default list."""
-    cats = []
-    try:
-        for t in point_tokens: 
-            cat = t.pid.split('.')[0]
-            if cat not in cats:
-                cats.append(cat)
-    except Exception:
-        pass
-    if not cats:
-        cats = [f"{i}. image" for i in range(1, 11)]
-    return cats
+    # -------------------------------------------------
+    # Paths
+    # -------------------------------------------------
 
-def _load_images_for_categories():
-    """
-    Load images from the pictures/ folder and populate:
-    - IMAGES_ORIG        : cat -> original QPixmap
-    - IMAGES_BY_CAT     : cat -> scaled QPixmap (UI / tokens)
-    - PNG_NAME_BY_CAT   : cat -> original filename (for CSV export)
-    """
-    import pathlib
-    global IMAGES_BY_CAT, IMAGES_ORIG, PNG_NAME_BY_CAT
+    def pictures_dir(self) -> str:
+        """Return the 'pictures' subfolder path relative to this script."""
+        base = os.path.dirname(os.path.abspath(__file__))
+        return os.path.join(base, "pictures")
 
-    folder = _pictures_dir()
-    exts = {'.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif'}
+    # -------------------------------------------------
+    # Categories
+    # -------------------------------------------------
 
-    paths = []
-    try:
-        for p in pathlib.Path(folder).iterdir():
-            if p.is_file() and p.suffix.lower() in exts:
-                paths.append(p)
-    except FileNotFoundError:
-        IMAGES_BY_CAT.clear()
-        IMAGES_ORIG.clear()
-        PNG_NAME_BY_CAT.clear()
-        return
+    def token_categories(self) -> list[str]:
+        """Return category names derived from point token ids or default list."""
+        cats = []
+        try:
+            for t in self.point_tokens:
+                cat = t.pid.split('.')[0]
+                if cat not in cats:
+                    cats.append(cat)
+        except Exception:
+            pass
 
-    if not paths:
-        IMAGES_BY_CAT.clear()
-        IMAGES_ORIG.clear()
-        PNG_NAME_BY_CAT.clear()
-        return
+        if not cats:
+            cats = [f"{i}. image" for i in range(1, 11)]
 
-    # Shuffle so category assignment is random but consistent per run
-    random.shuffle(paths)
+        return cats
 
-    cats = _token_categories()
-    if not cats:
-        return
+    # -------------------------------------------------
+    # Image loading
+    # -------------------------------------------------
 
-    # Limit images to number of categories
-    if len(paths) > len(cats):
-        paths = paths[:len(cats)]
+    def load_images_for_categories(self):
+        """
+        Load images from the pictures/ folder and populate:
+        - IMAGES_ORIG
+        - IMAGES_BY_CAT
+        - PNG_NAME_BY_CAT
+        """
+        folder = self.pictures_dir()
+        exts = {'.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif'}
 
-    IMAGES_BY_CAT.clear()
-    IMAGES_ORIG.clear()
-    PNG_NAME_BY_CAT.clear()
+        paths = []
+        try:
+            for p in pathlib.Path(folder).iterdir():
+                if p.is_file() and p.suffix.lower() in exts:
+                    paths.append(p)
+        except FileNotFoundError:
+            self.IMAGES_BY_CAT.clear()
+            self.IMAGES_ORIG.clear()
+            self.PNG_NAME_BY_CAT.clear()
+            return
 
-    for i, cat in enumerate(cats):
-        path = paths[i % len(paths)]
-        pm_orig = QPixmap(str(path))
+        if not paths:
+            self.IMAGES_BY_CAT.clear()
+            self.IMAGES_ORIG.clear()
+            self.PNG_NAME_BY_CAT.clear()
+            return
 
-        if pm_orig.isNull():
-            continue
+        random.shuffle(paths)
 
-        # 1) store original (for preview / export)
-        IMAGES_ORIG[cat] = pm_orig
+        cats = self.token_categories()
+        if not cats:
+            return
 
-        # 2) store scaled version (for tokens / overlays)
-        pm_scaled = pm_orig.scaled(
-            IMAGE_MAX_WH,
-            IMAGE_MAX_WH,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
-        )
-        IMAGES_BY_CAT[cat] = pm_scaled   # ✅ DAS BLEIBT
+        if len(paths) > len(cats):
+            paths = paths[:len(cats)]
 
-        # 3) store real filename for CSV
-        PNG_NAME_BY_CAT[cat] = path.name
+        self.IMAGES_BY_CAT.clear()
+        self.IMAGES_ORIG.clear()
+        self.PNG_NAME_BY_CAT.clear()
+
+        for i, cat in enumerate(cats):
+            path = paths[i % len(paths)]
+            pm_orig = QPixmap(str(path))
+
+            if pm_orig.isNull():
+                continue
+
+            # original image
+            self.IMAGES_ORIG[cat] = pm_orig
+
+            # scaled image (UI)
+            pm_scaled = pm_orig.scaled(
+                self.IMAGE_MAX_WH,
+                self.IMAGE_MAX_WH,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            self.IMAGES_BY_CAT[cat] = pm_scaled
+
+            # filename for CSV
+            self.PNG_NAME_BY_CAT[cat] = path.name
 
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
@@ -273,7 +297,7 @@ class _PointLabelFilter(QObject):
         except Exception:
             pass
         return False
-
+    
 POINT_LABEL_FILTER = _PointLabelFilter()
 
 class SceneView(GLViewWidget):
@@ -1122,23 +1146,6 @@ def _set_preview_for_category(cat: Optional[str]):
                                Qt.AspectRatioMode.KeepAspectRatio,
                                Qt.TransformationMode.SmoothTransformation)
     preview_box.setPixmap(pm_scaled)
-
-# def _center_on_screen():
-#     """Center main window on primary available geometry (macOS-friendly)."""
-#     try:
-#         screen = win.screen() or app.primaryScreen()
-#         geo = screen.availableGeometry()
-#         x = geo.x() + (geo.width() - win.width()) // 2
-#         y = geo.y() + (geo.height() - win.height()) // 2
-#         win.move(x, y)
-#     except Exception:
-#         try:
-#             fg = win.frameGeometry()
-#             center = app.primaryScreen().availableGeometry().center()
-#             fg.moveCenter(center)
-#             win.move(fg.topLeft())
-#         except Exception:
-#             pass
 
 def _cube_center():
     L = float(AXIS_LEN)
@@ -2908,8 +2915,17 @@ def apply_labels():
 
 for e in (edit_x, edit_y, edit_z):
     e.returnPressed.connect(apply_labels)
+    
+    
+file_handler = FileHandler(
+    point_tokens=point_tokens,
+    images_by_cat=IMAGES_BY_CAT,
+    images_orig=IMAGES_ORIG,
+    png_name_by_cat=PNG_NAME_BY_CAT,
+    image_max_wh=IMAGE_MAX_WH,
+)
 
-_load_images_for_categories()
+file_handler.load_images_for_categories()
 apply_labels()
 position_axis_labels()
 _position_header()

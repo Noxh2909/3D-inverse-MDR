@@ -4,6 +4,7 @@ import random
 from glob import glob
 import pathlib
 import csv
+import time
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -1488,18 +1489,39 @@ for items in AXIS_ITEMS.values():
         view.addItem(it)
         
 def _show_z_axis():
+    """Show the Y-axis (green) which is orthogonal to the 2D XZ plane."""
     for it in AXIS_ITEMS["y"]:
         try:
             view.addItem(it)
         except Exception:
             pass
+        # Restore green color
+        try:
+            it.setData(color=(0, 1, 0, 1))
+        except Exception:
+            pass
+    try:
+        axis_label_y.show()
+        axis_label_y.raise_()
+    except Exception:
+        pass
 
 def _hide_z_axis():
+    """Hide the Y-axis (green) which is orthogonal to the 2D XZ plane."""
     for it in AXIS_ITEMS["y"]:
         try:
             view.removeItem(it)
         except Exception:
             pass
+        # Fallback: make fully transparent
+        try:
+            it.setData(color=(0, 1, 0, 0))
+        except Exception:
+            pass
+    try:
+        axis_label_y.hide()
+    except Exception:
+        pass
 
 yz_grid = GLGridItem()
 yz_grid.setSize(x=AXIS_LEN, y=AXIS_LEN)
@@ -1980,15 +2002,47 @@ def hide_lattice():
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
 
-header_label = QLabel("", parent=view)
-header_label.setStyleSheet("color: #ffffff; font-size: 18px; font-weight: 600; background: transparent;")
-header_label.raise_()
+# Globales Header-Label (einmal erstellen)
+_header_label = None
+_header_y = 10  # Standard Y-Position
 
-def _position_header():
-    header_label.adjustSize()
-    x = (view.width() - header_label.width()) // 2
-    y = 12
-    header_label.move(x, y)
+def _position_header(text, y=None):
+    """
+    Display text centered at top of view.
+    y: Y-Position des Headers (default: 50)
+    If auto_hide_seconds > 0, hide after that many seconds using QTimer.
+    """
+    global _header_label, _header_y
+    
+    if y is not None:
+        _header_y = y
+    
+    # Label erstellen falls noch nicht vorhanden
+    if _header_label is None:
+        _header_label = QLabel(parent=view)
+        _header_label.setStyleSheet(
+            "color: #c13535; font-size: 20px; font-weight: 400; "
+            "background: rgba(0,0,0,0.7); padding: 10px 20px; border-radius: 10px;"
+        )
+    
+    _header_label.setText("Hint:" + text)
+    _header_label.adjustSize()
+    
+    # Zentrieren - nutze aktuelle View-Größe
+    vw = view.width() if view.width() > 0 else 800
+    x = (vw - _header_label.width()) // 2
+    
+    _header_label.move(x, _header_y)
+    _header_label.raise_()
+    _header_label.show()
+
+def _reposition_header():
+    """Re-center header label when view resizes."""
+    global _header_label, _header_y
+    if _header_label is not None and _header_label.isVisible():
+        vw = view.width() if view.width() > 0 else 800
+        x = (vw - _header_label.width()) // 2
+        _header_label.move(x, _header_y)
 
 axis_label_x = QLabel("", parent=view)
 axis_label_y = QLabel("", parent=view)
@@ -2481,12 +2535,16 @@ def _axis_display_name(edit_widget: QLineEdit, combo_widget, fallback: str) -> s
     except Exception:
         return f"{fallback}"
     
+# Track which conditions have been completed
+_SUBMITTED_CONDITIONS = set()
+
 def _export_results():
     """Export combined points to CSV (condition-specific folder)."""
     global CURRENT_CONDITION
     global ROTATION_DONE
     global HEIGHT_ADJUST_DONE
     global EXPERIMENT_RUNNING
+    global _SUBMITTED_CONDITIONS
 
     base = os.path.dirname(os.path.abspath(__file__))
     results_root = os.path.join(base, "results")
@@ -2557,9 +2615,21 @@ def _export_results():
         return
 
     # -------------------------------------------------
-    # Condition handling
+    # Condition handling: switch or exit
     # -------------------------------------------------
 
+    # Mark current condition as completed
+    _SUBMITTED_CONDITIONS.add(CURRENT_CONDITION)
+
+    # Check if both conditions are done
+    if _SUBMITTED_CONDITIONS == {"2d", "3d"}:
+        _position_header("Experiment Completed. Application will close in 5 seconds.")
+        time.sleep(5)
+        EXPERIMENT_RUNNING = False
+        QApplication.quit()
+        return
+
+    # Switch to the other condition
     if CURRENT_CONDITION == "2d":
         # ---- switch to 3D ----
         CURRENT_CONDITION = "3d"
@@ -2576,7 +2646,14 @@ def _export_results():
         btn_grid.setDisabled(False)
 
         _show_z_axis()
+        try:
+            axis_label_y.show()
+            axis_label_y.raise_()
+        except Exception:
+            pass
+
         set_view_default()
+        position_axis_labels()
 
         _update_label()
         _update_progress_counter()
@@ -2585,11 +2662,34 @@ def _export_results():
         logger.log_session_event("submitted 2D, switched to 3D")
 
     else:
-        # ---- both conditions done → exit ----
-        logger.log_session_event("submitted 3D, experiment finished")
-        EXPERIMENT_RUNNING = False
-        QApplication.quit()
-        return
+        # ---- switch to 2D ----
+        CURRENT_CONDITION = "2d"
+
+        condition_label.setText("2D Condition")
+        condition_label.adjustSize()
+        condition_label.raise_()
+
+        ROTATION_DONE = True
+        HEIGHT_ADJUST_DONE = True
+
+        cb_lock.setChecked(True)
+        cb_lock.hide()
+        btn_grid.setDisabled(True)
+
+        _hide_z_axis()
+        try:
+            axis_label_y.hide()
+        except Exception:
+            pass
+
+        set_view_xy()
+        position_axis_labels()
+
+        _update_label()
+        _update_progress_counter()
+
+        _reset_all_points()
+        logger.log_session_event("submitted 3D, switched to 2D")
 
 point_dock.adjustSize()
 point_dock.show()
@@ -2676,7 +2776,7 @@ QPushButton:disabled {
     border: 1px solid black;
 }
 """)
-btn_submit.setStyleSheet(btn_reset.styleSheet())
+btn_submit.setStyleSheet(btn_reset.styleSheet() + """QPushButton { background: #00cc66; border: solid lightgray;}""")
 btn_start.setStyleSheet(btn_reset.styleSheet() + """QPushButton { background: #00cc66; border: solid lightgray;}""")
 btn_grid.setStyleSheet(btn_reset.styleSheet())
 
@@ -2831,7 +2931,6 @@ def apply_labels():
         lab.show()
         lab.raise_()
     # header_label.setText(f"X: {tx}    Y: {tz}    Z: {ty}")
-    _position_header()
     position_axis_labels()
 
 for e in (edit_x, edit_y, edit_z):
@@ -2849,7 +2948,6 @@ file_handler = FileHandler(
 file_handler.load_images_for_categories()
 apply_labels()
 position_axis_labels()
-_position_header()
 _update_token_states()
 _ensure_axis_tick_labels()
 _update_submit_state()
@@ -2956,7 +3054,7 @@ def _finalize_ui_startup():
     # 3) Header & Axis-Labels
     position_axis_labels()
 
-    # 4) Kamera & Achsen
+    # 5) Kamera & Achsen
     if CURRENT_CONDITION == "2d":
         rotate_and_adjust_cb.setChecked
         adjust_token_height_cb.setChecked
@@ -2964,20 +3062,22 @@ def _finalize_ui_startup():
         btn_grid.setDisabled(True)
         cb_lock.hide()
         set_view_xy()
+        # _position_header("Please Place Stimuli on 2d Grid")
         _hide_z_axis()
     else:
         cb_lock.setChecked(False)
         cb_lock.show()
+        # _position_header("Please Place Stimuli within the 3d Grid")
         set_view_default()
         _show_z_axis()
 
-    # 5) Ein sauberer Layout-Pass
+    # 6) Ein sauberer Layout-Pass
     win.adjustSize()
 
-    # 6) Rendering aktivieren
+    # 7) Rendering aktivieren
     win.setUpdatesEnabled(True)
 
-    # 7) JETZT anzeigen (kein Flackern)
+    # 8) JETZT anzeigen (kein Flackern)
     _show_fullscreen_on_current_screen()
 
 # ------------------------------------------------------------
@@ -2998,10 +3098,10 @@ def _win_resize(ev):
     if _old_win_resize:
         _old_win_resize(ev)
 
-    _position_header()
     position_axis_labels()
     _update_all_point_labels()
     _update_token_states()
+    _reposition_header()
 
     # Lock-Checkbox unten rechts im View
     cb_lock.move(

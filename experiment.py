@@ -2623,8 +2623,8 @@ def _export_results():
 
     # Check if both conditions are done
     if _SUBMITTED_CONDITIONS == {"2d", "3d"}:
-        _position_header("Experiment Completed. Application will close in 5 seconds.")
-        time.sleep(5)
+        # _position_header("Experiment Completed. Application will close in 5 seconds.")
+        # time.sleep(5)
         EXPERIMENT_RUNNING = False
         QApplication.quit()
         return

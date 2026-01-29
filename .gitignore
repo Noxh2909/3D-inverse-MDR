@@ -9,10 +9,8 @@
 /analysis/
 
 buildapp.sh
-app_icon_icns
+app_icon.icns
 Interface.py
-training.py
-analysis.py
 
 3D-iMDS.spec
 3D inverse MDS.spec

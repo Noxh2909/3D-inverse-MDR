@@ -10,7 +10,7 @@ from typing import Dict, Optional
 import numpy as np
 from PySide6.QtWidgets import (
     QApplication, QWidget, QFrame, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout,
-    QLabel, QCheckBox, QMainWindow, QSizePolicy, QGridLayout, QScrollArea, QPlainTextEdit, QSlider
+    QLabel, QCheckBox, QMainWindow, QSizePolicy, QGridLayout, QScrollArea, QPlainTextEdit, QSlider, QDialog, QRadioButton
 )
 from PySide6.QtGui import QVector3D, QDrag, QCursor, QPixmap, QFont, QKeySequence, QShortcut
 from PySide6.QtCore import Qt, QTimer, QMimeData, QPoint, QObject
@@ -154,13 +154,18 @@ class Logger:
         elapsed = (datetime.now() - self.start_time).total_seconds()
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+        # Get participant name
+        participant_name = name_input.text().strip().replace(" ", "_")
+        if not participant_name:
+            participant_name = "anonymous"
+
         base = os.path.dirname(os.path.abspath(__file__))
-        log_dir = os.path.join(base, "logs")
+        log_dir = os.path.join(base, "logs", participant_name)
         os.makedirs(log_dir, exist_ok=True)
 
         log_path = os.path.join(
             log_dir,
-            f"session_log_{self.start_time.strftime('%Y%m%d_%H%M%S')}.csv"
+            f"{participant_name}_log_{self.start_time.strftime('%Y%m%d_%H%M%S')}.csv"
         )
 
         self.write_log_to_file(
@@ -2858,7 +2863,70 @@ view.sigMouseMoved = getattr(view, 'sigMouseMoved', None)
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
 
-CURRENT_CONDITION = "2d"
+# CURRENT_CONDITION = "2d"
+# Show condition selection dialog before starting
+
+class ConditionDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Select Condition")
+        self.setModal(True)
+        self.selected_condition = None
+        
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+        layout.setContentsMargins(30, 30, 30, 30)
+        
+        # Title
+        title = QLabel("Please select the experimental condition:")
+        title.setStyleSheet("font-size: 16px; font-weight: bold;")
+        layout.addWidget(title)
+        
+        # Radio buttons
+        self.radio_2d = QRadioButton("2D Condition")
+        self.radio_3d = QRadioButton("3D Condition")
+        self.radio_2d.setStyleSheet("font-size: 14px; padding: 10px;")
+        self.radio_3d.setStyleSheet("font-size: 14px; padding: 10px;")
+        
+        self.radio_2d.setChecked(True)  # Default selection
+        
+        layout.addWidget(self.radio_2d)
+        layout.addWidget(self.radio_3d)
+        
+        # Start button
+        btn_start = QPushButton("Start Experiment")
+        btn_start.setStyleSheet("""
+            QPushButton {
+                background: #00cc66;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 12px 24px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: #00b359;
+            }
+        """)
+        btn_start.clicked.connect(self.accept)
+        layout.addWidget(btn_start)
+        
+        self.setFixedSize(400, 250)
+    
+    def get_condition(self):
+        if self.radio_2d.isChecked():
+            return "2d"
+        else:
+            return "3d"
+
+# Show dialog and get condition
+dialog = ConditionDialog()
+if dialog.exec() == QDialog.DialogCode.Accepted:
+    CURRENT_CONDITION = dialog.get_condition()
+else:
+    # User cancelled - exit application
+    sys.exit(0)
 
 # ------------------------------------------------------------
 # Condition defaults (MUSS vor Counter kommen)

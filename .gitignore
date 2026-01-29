@@ -6,6 +6,7 @@
 /assets/
 /dist/
 /shared/
+/analysis/
 
 buildapp.sh
 app_icon_icns

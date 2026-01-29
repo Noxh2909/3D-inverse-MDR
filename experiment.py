@@ -68,6 +68,9 @@ IMAGE_CONTAINER_WH = 120
 LABEL_SCREEN_MARGIN = 24
 VIS_DOT_THRESHOLD = 0.0
 
+TUTORIAL_ROTATION_DONE = False
+TUTORIAL_HEIGHT_DONE = False
+
 ALIGN_OK_HTML = "<span style='color:#7CFC00'>✅ {partner}</span>"
 ALIGN_BAD_HTML = "<span style='color:#ff6666'>❌ {partner}</span>"
 
@@ -1240,6 +1243,12 @@ def _start_experiment():
 
     start_cb.setChecked(True)
     cb_lock.setChecked(True)
+    
+    name_cb.setChecked(True)
+    check_hover_cb.setChecked(True)
+    stimuli_cb.setChecked(True)
+    rotate_and_adjust_cb.setChecked(True)
+    adjust_token_height_cb.setChecked(True)
 
     btn_start.setDisabled(True)
     name_input.setDisabled(True)
@@ -1409,57 +1418,6 @@ def _build_axis_solid(axis: str, L: float, color=(1,1,1,1), width=3):
         return [_axis_segment((0,0,0), (0,L,0), color=color, width=width)]
     else:
         return [_axis_segment((0,0,0), (0,0,L), color=color, width=width)]
-
-# def _build_axis_dashed(axis: str, L: float, color=(1,1,1,1), width=3,
-#                        dash_len: float=DASH_LEN, gap_len: float=GAP_LEN):
-#     items = []
-#     s = 0.0
-#     step = max(1e-6, float(dash_len + gap_len))
-#     while s < L - 1e-9:
-#         e = min(L, s + dash_len)
-#         if axis == 'x':
-#             items.append(_axis_segment((s,0,0), (e,0,0), color=color, width=width))
-#         elif axis == 'y':
-#             items.append(_axis_segment((0,s,0), (0,e,0), color=color, width=width))
-#         else:
-#             items.append(_axis_segment((0,0,s), (0,0,e), color=color, width=width))
-#         s += step
-#     return items
-
-# def _screen_perp_tick_on_z(z_val: float, screen_len_px: int = 12):
-#     """
-#     Compute two world points that correspond to a short screen-perpendicular tick centered
-#     on the projected Z-axis location at z_val. Returns ((xL,yL,z),(xR,yR,z)) or None.
-#     """
-#     Img = (0.0, 0.0, float(z_val))
-#     pr = project_point(Img)
-#     if pr is None:
-#         return None
-#     px, py = pr
-#     dz = 0.01
-#     pr2 = project_point((0.0, 0.0, float(z_val) + dz))
-#     if pr2 is None:
-#         return None
-#     vx = float(pr2[0] - px)
-#     vy = float(pr2[1] - py)
-#     nx, ny = -vy, vx
-#     nlen = (nx*nx + ny*ny) ** 0.5 or 1.0
-#     nx /= nlen
-#     ny /= nlen
-#     half = screen_len_px * 0.5
-#     pL = (int(px - nx * half), int(py - ny * half))
-#     pR = (int(px + nx * half), int(py + ny * half))
-#     p0L, p1L = screen_to_world_ray(pL[0], pL[1])
-#     p0R, p1R = screen_to_world_ray(pR[0], pR[1])
-#     if p0L is None or p1L is None or p0R is None or p1R is None:
-#         return None
-#     hitL = intersect_with_plane(p0L, p1L, 'xy')
-#     hitR = intersect_with_plane(p0R, p1R, 'xy')
-#     if hitL is None or hitR is None:
-#         return None
-#     xL, yL, _ = hitL
-#     xR, yR, _ = hitR
-#     return (xL, yL, float(z_val)), (xR, yR, float(z_val))
 
 def _build_axis_ticks(axis: str, L: float, tick_step: float=0,
                       tick_size: float=TICK_SIZE, color=(1,1,1,0.9), width=2):
@@ -1662,23 +1620,6 @@ def _ensure_hover_preview() -> QLabel:
         lab.hide()
         HOVER_PREVIEW_LABEL = lab
     return HOVER_PREVIEW_LABEL
-
-# This function previews the current category image near the mouse cursor in the 3D view.
-
-# def _show_hover_preview(cat: str, view_pos: QPoint):
-#     """Show small hover thumbnail near view_pos inside the scene."""
-#     pm = IMAGES_BY_CAT.get(cat)
-#     if pm is None or pm.isNull():
-#         _hide_hover_preview()
-#         return
-#     lab = _ensure_hover_preview()
-#     lab.setPixmap(pm)
-#     lab.adjustSize()
-#     x = int(view_pos.x() - lab.width() // 2)
-#     y = int(view_pos.y() - lab.height() - IMAGE_OVER_POINT_MARGIN)
-#     lab.move(x, y)
-#     lab.show()
-#     lab.lower()
 
 def _show_hover_preview_over_dock_impl(cat: str):
     """Show larger preview above the token dock for a category."""
@@ -2027,32 +1968,6 @@ def hide_lattice():
         except Exception:
             pass
     lattice_items = []
-
-# ---------------------------------------------------------------------
-# ---------------------------------------------------------------------
-# Camera helpers
-# ---------------------------------------------------------------------
-# ---------------------------------------------------------------------
-
-# def _cube_center():
-#     L = float(AXIS_LEN)
-#     return QVector3D(L/2.0, L/2.0, L/2.0)
-
-# def _fit_distance_for_extent(extent: float, margin: float = 2) -> float:
-#     """Compute camera distance so a given extent is visible respecting FOV."""
-#     w = max(1, view.width())
-#     h = max(1, view.height())
-#     vfov_deg = float(view.opts.get('fov', 60))
-#     vfov = np.deg2rad(vfov_deg)
-#     aspect = w / h
-#     hfov = 2.0 * np.arctan(np.tan(vfov/2.0) * aspect)
-#     half = extent / 2.0
-#     d_v = half / np.tan(vfov/2.0)
-#     d_h = half / np.tan(hfov/2.0)
-#     return float(max(d_v, d_h) * margin)
-
-# view.opts['center'] = _cube_center()
-# view.setCameraPosition(distance=_fit_distance_for_extent(13), elevation=35.3, azimuth=45)
 
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
@@ -2512,18 +2427,6 @@ for i in range(1, 13):
     point_dock_layout.addWidget(t, row, 0)
     _update_token_states()
 
-# def _all_pairs_combined() -> bool:
-#     """Return True if all categories have a combined point (ImgN) placed and no .1/.2 remain."""
-#     cats = _token_categories()
-#     if not cats:
-#         return False
-#     for c in cats:
-#         if c not in placed_points:
-#             return False
-#         if f"{c}.1" in placed_points or f"{c}.2" in placed_points:
-#             return False
-#     return True
-
 def _update_submit_state():
     try:
         total = len(point_tokens)
@@ -2575,6 +2478,10 @@ def _axis_display_name(edit_widget: QLineEdit, combo_widget, fallback: str) -> s
     
 def _export_results():
     """Export combined points to CSV (condition-specific folder)."""
+    global CURRENT_CONDITION
+    global ROTATION_DONE
+    global HEIGHT_ADJUST_DONE
+    global EXPERIMENT_RUNNING
 
     base = os.path.dirname(os.path.abspath(__file__))
     results_root = os.path.join(base, "results")
@@ -2622,16 +2529,15 @@ def _export_results():
             # --- data ---
             rows = _collect_combined_points_norm()
             for name, xn, yn, zn in rows:
-
                 if CURRENT_CONDITION == "2d":
-                    # visuell: X horizontal, Z vertikal
+                    # 2D: X horizontal, Y vertical
                     x_csv = xn
-                    y_csv = yn   # ← DAS ist deine zweite Dimension
+                    y_csv = yn
                     z_csv = 0.0
                 else:
-                    # echtes 3D
-                    x_csv = xn 
-                    y_csv = zn #Height depth vertauschen
+                    # 3D: echte 3D-Koordinaten (bewusst umsortiert)
+                    x_csv = xn
+                    y_csv = zn
                     z_csv = yn
 
                 w.writerow([
@@ -2644,31 +2550,41 @@ def _export_results():
     except Exception as e:
         logger.log_session_event(f"Failed to write CSV: {e}")
         return
-    # try:
-    #     header_label.setText("Experiment")
-    #     _position_header()
-    # except Exception:
-    #     pass
-    # -------- SWITCH CONDITION AFTER SUBMIT --------
-    # global CURRENT_CONDITION
-    
-    # # Toggle between 2d ↔ 3d
-    # if CURRENT_CONDITION == "2d":
-    #     CURRENT_CONDITION = "3d"
-    #     set_view_default()
-    # else:
-    #     CURRENT_CONDITION = "2d"
-    #     set_view_xy()
 
-    # condition_label.setText(f"{CURRENT_CONDITION.upper()} Condition")
-    # condition_label.adjustSize()
-    # condition_label.raise_()
+    # -------------------------------------------------
+    # Condition handling
+    # -------------------------------------------------
 
-    # --- reset & log ---
-    _reset_all_points()
-    logger.log_session_event("submitted, finished experiment")
-    app.quit
+    if CURRENT_CONDITION == "2d":
+        # ---- switch to 3D ----
+        CURRENT_CONDITION = "3d"
 
+        condition_label.setText("3D Condition")
+        condition_label.adjustSize()
+        condition_label.raise_()
+
+        ROTATION_DONE = False
+        HEIGHT_ADJUST_DONE = False
+
+        cb_lock.setChecked(False)
+        cb_lock.show()
+        btn_grid.setDisabled(False)
+
+        _show_z_axis()
+        set_view_default()
+
+        _update_label()
+        _update_progress_counter()
+
+        _reset_all_points()
+        logger.log_session_event("submitted 2D, switched to 3D")
+
+    else:
+        # ---- both conditions done → exit ----
+        logger.log_session_event("submitted 3D, experiment finished")
+        EXPERIMENT_RUNNING = False
+        QApplication.quit()
+        return
 
 point_dock.adjustSize()
 point_dock.show()
@@ -2956,11 +2872,6 @@ def _apply_condition_defaults():
         HEIGHT_ADJUST_DONE = True
         rotate_and_adjust_cb.setChecked(True)
         adjust_token_height_cb.setChecked(True)
-    else:
-        ROTATION_DONE = False
-        HEIGHT_ADJUST_DONE = False
-        rotate_and_adjust_cb.setChecked(False)
-        adjust_token_height_cb.setChecked(False)
 
 # ------------------------------------------------------------
 # Startup finalization (EINMALIG)

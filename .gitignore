@@ -7,6 +7,7 @@
 /dist/
 /shared/
 /analysis/
+*debriefing/
 
 buildapp.sh
 app_icon.icns

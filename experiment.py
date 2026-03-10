@@ -203,7 +203,20 @@ class FileHandler:
     def pictures_dir(self) -> str:
         """Return the 'pictures' subfolder path relative to this script."""
         base = os.path.dirname(os.path.abspath(__file__))
-        return os.path.join(base, "pictures")
+        return os.path.join(base, "pictures_test")
+
+    def count_images(self) -> int:
+        """Count the number of image files in the pictures folder."""
+        folder = self.pictures_dir()
+        exts = {'.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif'}
+        count = 0
+        try:
+            for p in pathlib.Path(folder).iterdir():
+                if p.is_file() and p.suffix.lower() in exts:
+                    count += 1
+        except FileNotFoundError:
+            pass
+        return count
 
     # -------------------------------------------------
     # Categories
@@ -221,7 +234,8 @@ class FileHandler:
             pass
 
         if not cats:
-            cats = [f"{i}. image" for i in range(1, 11)]
+            n = max(1, self.count_images())
+            cats = [f"{i}. image" for i in range(1, n + 1)]
 
         return cats
 
@@ -262,15 +276,18 @@ class FileHandler:
         if not cats:
             return
 
+        # Match images 1:1 to categories — no repetition
         if len(paths) > len(cats):
             paths = paths[:len(cats)]
+        if len(cats) > len(paths):
+            cats = cats[:len(paths)]
 
         self.IMAGES_BY_CAT.clear()
         self.IMAGES_ORIG.clear()
         self.PNG_NAME_BY_CAT.clear()
 
         for i, cat in enumerate(cats):
-            path = paths[i % len(paths)]
+            path = paths[i]
             pm_orig = QPixmap(str(path))
 
             if pm_orig.isNull():
@@ -2494,7 +2511,17 @@ def _update_pair_line(cat: str):
                 pass
             del pair_lines[cat]
 
-for i in range(1, 13):
+# --- Count images to determine token count ---
+_img_count = FileHandler(
+    point_tokens=[],
+    images_by_cat={},
+    images_orig={},
+    png_name_by_cat={},
+    image_max_wh=IMAGE_MAX_WH,
+).count_images()
+_img_count = max(1, _img_count)  # at least 1 token
+
+for i in range(1, _img_count + 1):
     t = DraggableToken(f"{i}. Stimulus", parent=point_dock)
     t.setMinimumWidth(110)
     t.setFixedHeight(26)

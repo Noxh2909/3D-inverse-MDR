@@ -8,6 +8,7 @@
 /shared/
 /analysis/
 *debriefing/
+/pictures_test/
 
 buildapp.sh
 app_icon.icns

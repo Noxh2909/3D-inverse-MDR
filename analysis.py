@@ -64,7 +64,7 @@ def load_embedding(csv_path):
 # IMAGE HELPERS
 # -------------------------------------------------
 
-def load_image(name, zoom=0.25):
+def load_image(name, zoom=0.35):
     path = PICTURES_DIR / name
     if not path.exists():
         return None
@@ -95,6 +95,21 @@ def add_projected_images_3d(ax, names, coords, zoom=0.12):
             zorder=10,
         )
         ax.add_artist(annotation)
+
+
+def add_depth_guides_3d(ax, coords):
+    """Add one subtle dashed vertical line from each stimulus down to the floor."""
+    z_min, _ = ax.get_zlim()
+
+    for x_coord, y_coord, z_coord in coords:
+        ax.plot([x_coord, x_coord], [y_coord, y_coord], [z_min, z_coord],
+                linestyle="--", linewidth=0.8, color="black", alpha=0.42,
+                zorder=1)
+
+
+def remap_coords_for_3d_axes(coords):
+    """Keep original 3D axis order."""
+    return coords[:, [0, 1, 2]]
 
 # -------------------------------------------------
 # PER-PARTICIPANT STIMULUS ARRANGEMENT (2D scatter / 3D cube)
@@ -143,10 +158,15 @@ def plot_participant_arrangement_3d(names, coords, participant_label, out_path):
     """3D cube scatter of stimuli as placed by one participant, with images."""
     fig = plt.figure(figsize=(11, 10))
     ax = fig.add_subplot(111, projection="3d")
-    x, y, z = coords[:, 0], coords[:, 1], coords[:, 2]
+    remapped_coords = remap_coords_for_3d_axes(coords)
+    x, y, z = remapped_coords[:, 0], remapped_coords[:, 1], remapped_coords[:, 2]
 
     ax.scatter(x, y, z, s=0, alpha=0)
-    add_projected_images_3d(ax, names, coords, zoom=0.16)
+    ax.set_xlim(-1, 1)
+    ax.set_ylim(1, -1)
+    ax.set_zlim(-1, 1)
+    add_depth_guides_3d(ax, remapped_coords)
+    add_projected_images_3d(ax, names, remapped_coords, zoom=0.30)
 
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
@@ -200,10 +220,15 @@ def plot_procrustes_arrangement_3d(aligned_list, mean_shape, participant_names,
     """3D cube showing only the Procrustes mean shape with stimulus images."""
     fig = plt.figure(figsize=(12, 11))
     ax = fig.add_subplot(111, projection="3d")
+    remapped_mean_shape = remap_coords_for_3d_axes(mean_shape)
 
-    ax.scatter(mean_shape[:, 0], mean_shape[:, 1], mean_shape[:, 2],
+    ax.scatter(remapped_mean_shape[:, 0], remapped_mean_shape[:, 1], remapped_mean_shape[:, 2],
                s=0, alpha=0)
-    add_projected_images_3d(ax, stimulus_names, mean_shape, zoom=0.18)
+    ax.set_xlim(-1, 1)
+    ax.set_ylim(1, -1)
+    ax.set_zlim(-1, 1)
+    add_depth_guides_3d(ax, remapped_mean_shape)
+    add_projected_images_3d(ax, stimulus_names, remapped_mean_shape, zoom=0.30)
 
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
@@ -223,13 +248,18 @@ def plot_dissimilarity_matrix(names, D, csv_name, out_dir):
     n = len(names)
     fig, ax = plt.subplots(figsize=(1.2 * n, 1.2 * n))
 
-    im = ax.imshow(D, cmap="viridis")
+    lower_triangle_mask = np.triu(np.ones_like(D, dtype=bool), k=1)
+    masked_D = np.ma.array(D, mask=lower_triangle_mask)
+    cmap = plt.cm.get_cmap("viridis").copy()
+    cmap.set_bad(color="white", alpha=0)
+
+    im = ax.imshow(masked_D, cmap=cmap)
     ax.set_xticks([])
     ax.set_yticks([])
 
     # --- values inside cells ---
     for i in range(n):
-        for j in range(n):
+        for j in range(i + 1):
             ax.text(
                 j, i,
                 f"{D[i, j]:.2f}",
@@ -249,10 +279,10 @@ def plot_dissimilarity_matrix(names, D, csv_name, out_dir):
         # X axis
         ab_x = AnnotationBbox(
             img_x,
-            (i, -0.9),
+            (i, n - 0.1),
             xycoords="data",
             frameon=False,
-            box_alignment=(0.5, 1)
+            box_alignment=(0.5, 0)
         )
         ax.add_artist(ab_x)
 
@@ -268,7 +298,7 @@ def plot_dissimilarity_matrix(names, D, csv_name, out_dir):
             ax.add_artist(ab_y)
 
     ax.set_xlim(-1, n - 0.5)
-    ax.set_ylim(n - 0.5, -1)
+    ax.set_ylim(n + 0.1, -1)
 
     plt.colorbar(im, fraction=0.046, pad=0.04)
     plt.title("Dissimilarity Matrix (Euclidean Distance)")
@@ -607,11 +637,16 @@ def plot_procrustes_dissimilarity_matrix(coords_list, participant_names, conditi
     
     # Plot matrix
     fig, ax = plt.subplots(figsize=(max(8, n * 0.8), max(8, n * 0.8)))
-    im = ax.imshow(D, cmap="viridis")
+    lower_triangle_mask = np.triu(np.ones_like(D, dtype=bool), k=1)
+    masked_D = np.ma.array(D, mask=lower_triangle_mask)
+    cmap = plt.cm.get_cmap("viridis").copy()
+    cmap.set_bad(color="white", alpha=0)
+
+    im = ax.imshow(masked_D, cmap=cmap)
     
     # Add values inside cells
     for i in range(n):
-        for j in range(n):
+        for j in range(i + 1):
             ax.text(
                 j, i,
                 f"{D[i, j]:.3f}",
